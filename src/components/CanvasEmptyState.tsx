@@ -1,4 +1,5 @@
 import { Code2, Eye, Layers, Sparkles } from 'lucide-react'
+import MermapixLogo from './MermapixLogo.tsx'
 
 export interface CanvasEmptyStateProps {
   onLoadSample: () => void
@@ -7,7 +8,9 @@ export interface CanvasEmptyStateProps {
 export default function CanvasEmptyState({ onLoadSample }: CanvasEmptyStateProps) {
   return (
     <div className="canvas-empty-state">
-      <div className="empty-state-badge">Mermapix</div>
+      <div className="empty-state-logo">
+        <MermapixLogo theme="auto" height={30} />
+      </div>
       <h2>Mermaid to Editable Figma Layers</h2>
       <p className="empty-state-subtitle">
         Paste code, see live preview, and paste directly into Figma as real vector shapes and text

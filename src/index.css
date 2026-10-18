@@ -914,6 +914,12 @@ button, a {
   font-family: "JetBrains Mono", monospace;
   font-size: var(--code-font-size, 12px);
   line-height: var(--code-line-height, 20px);
+  font-weight: 400;
+  letter-spacing: 0;
+  word-spacing: 0;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+  text-rendering: optimizeSpeed;
   tab-size: 2;
   white-space: pre;
   overflow: auto;
@@ -927,6 +933,9 @@ button, a {
 .code-highlight {
   pointer-events: none;
   color: var(--editor-text);
+  /* Own stacking context so badge backgrounds (z-index:-1) paint above the
+     editor surface but below the glyphs. */
+  z-index: 1;
 }
 
 .code-textarea {
@@ -945,22 +954,34 @@ button, a {
 .mpx-app[data-theme="light"] .tok-string { color: #b45309; }
 .mpx-app[data-theme="dark"] .tok-string { color: #fbbf24; }
 
+/* Inline badge: must NOT change font-size, line-height, letter-spacing, padding
+   or borders — any of those grows the line box or char advance and desyncs the
+   highlight overlay from the textarea/gutter. The visible pill is drawn by an
+   absolutely positioned ::before that bleeds 4px sideways, so it looks padded
+   without moving a single glyph. */
 .tok-key {
-  display: inline-block;
-  padding: 0 4px;
-  border-radius: 4px;
-  font-weight: 700;
-  font-size: 10px;
-  letter-spacing: 0.04em;
+  display: inline;
+  position: relative;
+  font-weight: inherit;
 }
-.mpx-app[data-theme="light"] .tok-key { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
-.mpx-app[data-theme="dark"] .tok-key { background: rgba(244, 63, 94, 0.2); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.4); }
+.tok-key::before {
+  content: "";
+  position: absolute;
+  inset: 0 -5px;
+  border-radius: 4px;
+  z-index: -1;
+  pointer-events: none;
+}
+.mpx-app[data-theme="light"] .tok-key { color: #b91c1c; }
+.mpx-app[data-theme="light"] .tok-key::before { background: #fee2e2; box-shadow: inset 0 0 0 1px #fca5a5; }
+.mpx-app[data-theme="dark"] .tok-key { color: #fb7185; }
+.mpx-app[data-theme="dark"] .tok-key::before { background: rgba(244, 63, 94, 0.2); box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.4); }
 
 .tok-type { font-weight: 500; }
 .mpx-app[data-theme="light"] .tok-type { color: #0284c7; }
 .mpx-app[data-theme="dark"] .tok-type { color: #38bdf8; }
 
-.tok-arrow { font-weight: 700; }
+.tok-arrow { font-weight: 600; }
 .mpx-app[data-theme="light"] .tok-arrow { color: #059669; }
 .mpx-app[data-theme="dark"] .tok-arrow { color: #34d399; }
 
@@ -1342,17 +1363,11 @@ button, a {
   z-index: 5;
 }
 
-.empty-state-badge {
-  display: inline-block;
-  padding: 3px 11px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border-radius: 999px;
-  background: var(--brand-bottom);
-  color: #ffffff;
-  margin-bottom: 12px;
+.empty-state-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
+  color: var(--header-text);
 }
 
 .canvas-empty-state h2 {

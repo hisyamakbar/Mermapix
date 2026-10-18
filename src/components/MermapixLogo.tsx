@@ -2,10 +2,11 @@ export default function MermapixLogo({
   theme,
   height = 32,
 }: {
-  theme: 'light' | 'dark'
+  /** 'auto' inherits the wordmark color from the parent's CSS `color`. */
+  theme: 'light' | 'dark' | 'auto'
   height?: number
 }) {
-  const textColor = theme === 'dark' ? '#FFFFFF' : '#16161D'
+  const textColor = theme === 'auto' ? 'currentColor' : theme === 'dark' ? '#FFFFFF' : '#16161D'
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

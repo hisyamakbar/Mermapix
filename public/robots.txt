@@ -1,0 +1,39 @@
+# Robots.txt for Mermapix (https://mermapix.netlify.app)
+User-agent: *
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+# Common AI User-Agents
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+# Sitemap
+Sitemap: https://mermapix.netlify.app/sitemap.xml

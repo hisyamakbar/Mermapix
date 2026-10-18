@@ -1,0 +1,151 @@
+# Mermapix — Full Technical Reference for AI Agents & LLMs
+
+> **Mermapix** is an open-source tool and Figma plugin that converts Mermaid diagrams, DBML, and SQL DDL schemas into native, fully editable Figma vector layers with clean Auto Layout frames.
+
+---
+
+## 1. System Overview & Problem Statement
+
+### The Problem
+When developers copy or export diagrams from traditional tools (Mermaid Live, PlantUML, dbdocs, DBeaver) into Figma:
+- SVGs with `<foreignObject>` or HTML-based labels render as invisible or broken layers in Figma.
+- Font glyphs get rendered as flattened vector outlines (meaning text cannot be double-clicked or edited).
+- Diagrams export as deeply nested, redundant `<g>` groups that clutter the Figma layer tree.
+- ERD tables lack Figma Auto Layout, making manual field additions or edits tedious.
+
+### The Solution: Mermapix Architecture
+Mermapix implements a specialized SVG normalization and AST transformation pipeline:
+1. **SVG Pipeline (`src/export/svg.ts`)**:
+   - Strips `<foreignObject>` and enforces strict SVG 1.1 compliant `<text>` and `<tspan>` elements with explicit Cartesian coordinates (`x`, `y`, `dx`, `dy`).
+   - Resolves and inlines CSS variables into static presentation attributes (`fill`, `stroke`, `font-family`, `font-size`, `font-weight`).
+   - Normalizes arrowheads and markers (`marker-end="url(#...)"`) to prevent detached or invisible relationship lines in Figma.
+   - Wraps clipboard payloads with standard MIME type `image/svg+xml` so pressing `Cmd+V` in Figma automatically pastes native vector objects.
+2. **Companion Figma Plugin (`plugin/code.ts`)**:
+   - Inspects imported vector groups and identifies ERD entity cards.
+   - Converts entity tables into native Figma vertical **Auto Layout** frames (`layoutMode = "VERTICAL"`).
+   - Dissolves redundant nested wrapper groups, elevating layers directly into a clean, searchable hierarchy.
+   - Operates 100% offline with zero external network access (`"allowedDomains": ["none"]`).
+
+---
+
+## 2. Supported Diagram Types & Syntax Examples
+
+### 2.1 Entity Relationship Diagrams (`erDiagram`)
+Recommended for database schemas and data models.
+```mermaid
+erDiagram
+  users {
+    uuid id PK
+    string email UK
+    string full_name
+    timestamp created_at
+  }
+  orders {
+    uuid id PK
+    uuid user_id FK
+    numeric total_amount
+    string status
+  }
+  order_items {
+    uuid id PK
+    uuid order_id FK
+    uuid product_id FK
+    int quantity
+    numeric unit_price
+  }
+  users ||--o{ orders : "places"
+  orders ||--|{ order_items : "contains"
+```
+
+### 2.2 Flowcharts (`graph` or `flowchart`)
+Supports Direction (`TD`, `TB`, `LR`, `RL`), Subgraphs, Decision Diamonds, and Styled Nodes.
+```mermaid
+flowchart TD
+  subgraph AuthFlow ["Authentication Pipeline"]
+    A[Client Request] --> B{Valid Session?}
+    B -- Yes --> C[Serve Cached Profile]
+    B -- No --> D[Evaluate JWT Token]
+    D --> E{Expired?}
+    E -- Yes --> F[Refresh Token Flow]
+    E -- No --> G[Grant Access]
+  end
+```
+
+### 2.3 Sequence Diagrams (`sequenceDiagram`)
+Supports Participants, Actors, Solid/Dotted Messages, and Self-Calls.
+```mermaid
+sequenceDiagram
+  autonumber
+  actor User
+  participant Client as Frontend SPA
+  participant API as Gateway API
+  participant DB as PostgreSQL
+  
+  User->>Client: Click Checkout
+  Client->>API: POST /api/v1/orders
+  API->>DB: INSERT INTO orders
+  DB-->>API: 201 Created (Order UUID)
+  API-->>Client: Return Order Confirmation
+  Client-->>User: Display Order Summary
+```
+
+### 2.4 Class Diagrams (`classDiagram`)
+Supports Classes, Fields, Methods, Visibility markers (`+`, `-`, `#`), and Inheritances (`<|--`).
+```mermaid
+classDiagram
+  class BaseEntity {
+    +UUID id
+    +Timestamp createdAt
+    +Timestamp updatedAt
+    +save() Boolean
+  }
+  class User {
+    +String email
+    -String passwordHash
+    +verifyPassword(String pwd) Boolean
+  }
+  BaseEntity <|-- User
+```
+
+---
+
+## 3. Schema Converters: DBML and SQL to Mermaid ERD
+
+Mermapix includes built-in client-side AST parsers in `src/converters/`:
+
+### 3.1 DBML (Database Markup Language)
+Converts table definitions, column types, field settings (`[pk, not null, unique]`), and relationships (`Ref: orders.user_id > users.id`) into clean Mermaid `erDiagram` syntax.
+
+### 3.2 SQL DDL (PostgreSQL & MySQL subset)
+Parses `CREATE TABLE <name> (...)` statements, column types (`UUID`, `VARCHAR`, `INT`, `DECIMAL`, `BOOLEAN`), primary keys, foreign keys, and unique constraints.
+
+---
+
+## 4. Best Practices for LLMs Generating Mermaid Code for Mermapix
+
+When an AI assistant or prompt engineer produces Mermaid diagrams for ingestion into Mermapix:
+1. **Prefer `erDiagram` for Schema Representation**: Mermapix's Figma plugin provides automatic vertical Auto Layout specifically tailored for ERD entity tables.
+2. **Avoid HTML tags inside node labels**: Use pure plain-text labels. Instead of `<br/>` or `<b>`, use newline separators or clear text.
+3. **Double-Quote Complex Labels**: If relationship labels or node names contain punctuation, parentheses, or dashes, wrap them in double quotes (e.g., `users ||--o{ orders : "places (1:N)"`).
+4. **Use Meaningful Cardinalities in ERD**:
+   - `||--||` : Exactly one to exactly one
+   - `||--o{` : One to zero or more
+   - `||--|{` : One to one or more
+   - `o|--o{` : Zero or one to zero or more
+
+---
+
+## 5. Privacy, Security, & Deployment Architecture
+
+- **100% Client-Side**: All parsing, rendering, and SVG sanitization happen in the user's browser or Figma plugin sandbox.
+- **Zero Data Collection**: Mermapix does not store schemas, diagram code, or user identifiers.
+- **Netlify Hosting**: Static Single Page Application (SPA) served via Vite bundle with client routing (`_redirects`) and immutable asset caching.
+
+---
+
+## 6. Official Links
+
+- Web Application: [https://mermapix.netlify.app/](https://mermapix.netlify.app/)
+- GitHub Repository: [https://github.com/hisyamakbar/Mermapix](https://github.com/hisyamakbar/Mermapix)
+- Figma Plugin: [https://www.figma.com/community/plugin/1693698850206280915](https://www.figma.com/community/plugin/1693698850206280915)
+- Standard LLM Entrypoint: [https://mermapix.netlify.app/llms.txt](https://mermapix.netlify.app/llms.txt)

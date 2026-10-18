@@ -1,0 +1,27 @@
+# Mermapix
+
+> Convert Mermaid diagrams (ERD-first, Flowchart, Sequence, Class), DBML, and SQL schemas into native, editable Figma vector layers with clean Auto Layout — not flat raster images.
+
+## Overview
+
+Mermapix solves the long-standing developer & designer pain point where diagrams exported from tools like Mermaid, dbdocs, or DBeaver paste into Figma as non-editable flat outlines or raster PNGs. 
+
+With Mermapix:
+1. **Web App (Zero-Install)**: Open in browser, paste or type Mermaid / DBML / SQL, and click **Copy to Figma** (or press `Cmd+C`). In Figma, pressing `Cmd+V` pastes the diagram as editable text nodes with `<tspan>` positions and vector paths.
+2. **Figma Companion Plugin (100% Offline)**: Generates native vertical **Auto Layout** frames for ERD entities, dissolvable redundant nested wrapper groups, and editable canvas objects directly inside Figma and FigJam.
+
+## Key Capabilities
+
+- **Mermaid to Figma Conversion**: Full support for Entity Relationship Diagrams (ERD `erDiagram`), Flowcharts (`graph` / `flowchart`), Sequence Diagrams (`sequenceDiagram`), and Class Diagrams (`classDiagram`).
+- **Schema Importers**: Built-in AST parsers for DBML (Database Markup Language) and SQL DDL (`CREATE TABLE` for PostgreSQL and MySQL) that translate schemas into Mermaid ERD.
+- **Native Auto Layout (Plugin)**: Converts ERD entities into vertical Auto Layout frames with responsive padding, headers, and column rows.
+- **Editable Typography**: Preserves real font families and editable text layers without flattening fonts into vector outlines.
+- **Theme Synchronization**: Dual-mode rendering with WCAG AAA compliance (Clean Neutral Light & Midnight Cyan Dark).
+- **100% Client-Side Privacy**: Runs completely offline in the browser / Figma sandbox (`allowedDomains: ["none"]`). No telemetry, no external database, no server data transmission.
+
+## Quick Links
+
+- [Web Application](https://mermapix.netlify.app/): Instant web canvas and SVG clipboard export.
+- [GitHub Repository](https://github.com/hisyamakbar/Mermapix): Open-source MIT repository, issues, and contributing.
+- [Figma Community Plugin](https://www.figma.com/community/plugin/1693698850206280915): Companion plugin for native Auto Layout frames.
+- [Full LLM Technical Guide](https://mermapix.netlify.app/llms-full.txt): Complete technical reference, parser details, and prompt examples for AI agents.

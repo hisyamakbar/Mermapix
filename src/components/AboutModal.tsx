@@ -73,7 +73,7 @@ export default function AboutModal({ isOpen, onClose }: AboutModalProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <h3 id="about-dialog-title">About Mermapix</h3>
               <span className="badge-offline" style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'var(--brand-glow)', color: 'var(--brand-top)', fontWeight: 600 }}>
-                v1.0.0
+                v1.0.2
               </span>
             </div>
             <p className="modal-desc">

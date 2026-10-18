@@ -1121,6 +1121,7 @@ button, a {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
   border-top: 1px solid var(--panel-border);
   padding-top: 10px;
 }

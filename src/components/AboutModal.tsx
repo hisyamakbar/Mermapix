@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { X, ExternalLink, ShieldCheck, Heart, Sparkles } from 'lucide-react'
+import GithubIcon from './GithubIcon.tsx'
 
 export interface AboutModalProps {
   isOpen: boolean
@@ -114,7 +115,16 @@ export default function AboutModal({ isOpen, onClose }: AboutModalProps) {
             >
               Hisyam Akbar
             </a>
-            . Licensed under the permissive <strong>MIT License</strong>.
+            . Source code available on{' '}
+            <a
+              href="https://github.com/hisyamakbar/Mermapix"
+              target="_blank"
+              rel="noreferrer noopener"
+              style={{ color: 'var(--btn-text)', fontWeight: 600, textDecoration: 'underline' }}
+            >
+              GitHub
+            </a>{' '}
+            under the permissive <strong>MIT License</strong>.
           </p>
 
           <div style={{ padding: '10px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-sunken)', border: '1px solid var(--panel-border)' }}>
@@ -150,7 +160,25 @@ export default function AboutModal({ isOpen, onClose }: AboutModalProps) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--panel-border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', paddingTop: '10px', borderTop: '1px solid var(--panel-border)' }}>
+          <a
+            href="https://github.com/hisyamakbar/Mermapix"
+            target="_blank"
+            rel="noreferrer noopener"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '12px',
+              color: 'var(--btn-text)',
+              textDecoration: 'none',
+              fontWeight: 600,
+            }}
+          >
+            <GithubIcon size={14} />
+            <span>GitHub Repository</span>
+            <ExternalLink size={11} color="var(--muted)" />
+          </a>
           <button
             type="button"
             className="action-btn action-btn-secondary"

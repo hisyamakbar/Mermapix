@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Wand2, FolderInput, ChevronDown, ExternalLink, PanelLeftClose, Sparkles } from 'lucide-react'
 import { EXAMPLES } from '../examples/index.ts'
 import CodeEditor from './CodeEditor.tsx'
+import GithubIcon from './GithubIcon.tsx'
 
 export interface EditorPanelProps {
   sidebarOpen: boolean
@@ -152,27 +153,41 @@ export default function EditorPanel({
             Hisyam Akbar
           </a>
         </p>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-          {onOpenAbout && (
-            <button
-              type="button"
-              onClick={onOpenAbout}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                fontSize: '11px',
-                color: 'var(--muted)',
-                cursor: 'pointer',
-                textDecoration: 'underline',
-                textUnderlineOffset: '2px',
-              }}
-              title="About Mermapix, open source licenses, and trademark disclaimers"
-            >
-              Legal &amp; About
-            </button>
-          )}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <a
+            className="editor-docs"
+            href="https://github.com/hisyamakbar/Mermapix"
+            target="_blank"
+            rel="noreferrer noopener"
+            title="View source code on GitHub"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+          >
+            <GithubIcon size={12} />
+            GitHub
+          </a>
           <span style={{ color: 'var(--panel-border)', fontSize: '10px' }}>•</span>
+          {onOpenAbout && (
+            <>
+              <button
+                type="button"
+                onClick={onOpenAbout}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  fontSize: '11px',
+                  color: 'var(--muted)',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '2px',
+                }}
+                title="About Mermapix, open source licenses, and trademark disclaimers"
+              >
+                Legal &amp; About
+              </button>
+              <span style={{ color: 'var(--panel-border)', fontSize: '10px' }}>•</span>
+            </>
+          )}
           <a
             className="editor-docs"
             href="https://mermaid.js.org/intro/syntax-reference.html"

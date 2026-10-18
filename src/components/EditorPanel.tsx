@@ -181,9 +181,9 @@ export default function EditorPanel({
                   textDecoration: 'underline',
                   textUnderlineOffset: '2px',
                 }}
-                title="About Mermapix, open source licenses, and trademark disclaimers"
+                title="About Mermapix, open source licenses, and disclaimers"
               >
-                Legal &amp; About
+                About
               </button>
               <span style={{ color: 'var(--panel-border)', fontSize: '10px' }}>•</span>
             </>

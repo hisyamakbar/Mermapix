@@ -68,17 +68,28 @@ export default function AboutModal({ isOpen, onClose }: AboutModalProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="about-dialog-title"
+        style={{ maxWidth: '440px' }}
       >
         <div className="modal-header">
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <h3 id="about-dialog-title">About Mermapix</h3>
-              <span className="badge-offline" style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'var(--brand-glow)', color: 'var(--brand-top)', fontWeight: 600 }}>
+              <span
+                className="badge-offline"
+                style={{
+                  fontSize: '10px',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  background: 'var(--brand-glow)',
+                  color: 'var(--brand-top)',
+                  fontWeight: 600,
+                }}
+              >
                 v1.0.2
               </span>
             </div>
             <p className="modal-desc">
-              Mermaid to Editable Figma layers. Generates clean Auto Layout frames, vector shapes, and editable text.
+              Mermaid to Editable Figma layers. 100% offline, free, and open-source.
             </p>
           </div>
           <button
@@ -92,20 +103,63 @@ export default function AboutModal({ isOpen, onClose }: AboutModalProps) {
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '4px 0' }}>
-          <span style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '4px', background: 'var(--chip-bg)', color: 'var(--chip-text)' }}>
-            <ShieldCheck size={12} color="#10b981" /> 100% Offline & Private
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '2px 0' }}>
+          <span
+            style={{
+              fontSize: '11px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              background: 'var(--chip-bg)',
+              color: 'var(--chip-text)',
+            }}
+          >
+            <ShieldCheck size={12} color="#10b981" /> 100% Offline &amp; Private
           </span>
-          <span style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '4px', background: 'var(--chip-bg)', color: 'var(--chip-text)' }}>
+          <span
+            style={{
+              fontSize: '11px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              background: 'var(--chip-bg)',
+              color: 'var(--chip-text)',
+            }}
+          >
             <Sparkles size={12} color="#06b6d4" /> Native Auto Layout
           </span>
-          <span style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '4px', background: 'var(--chip-bg)', color: 'var(--chip-text)' }}>
-            ⚖️ MIT Open Source
+          <span
+            style={{
+              fontSize: '11px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              background: 'var(--chip-bg)',
+              color: 'var(--chip-text)',
+            }}
+          >
+            <Heart size={12} color="#f43f5e" /> Free &amp; Open Source
           </span>
         </div>
 
-        <div style={{ fontSize: '12px', lineHeight: 1.6, color: 'var(--code-text)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <p style={{ margin: 0 }}>
+        <div
+          style={{
+            padding: '14px 16px',
+            borderRadius: 'var(--radius)',
+            background: 'var(--surface-sunken)',
+            border: '1px solid var(--panel-border)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+          }}
+        >
+          <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.5, color: 'var(--code-text)' }}>
             Created by{' '}
             <a
               href="https://hisyamakbar.com"
@@ -115,78 +169,45 @@ export default function AboutModal({ isOpen, onClose }: AboutModalProps) {
             >
               Hisyam Akbar
             </a>
-            . Source code available on{' '}
-            <a
-              href="https://github.com/hisyamakbar/Mermapix"
-              target="_blank"
-              rel="noreferrer noopener"
-              style={{ color: 'var(--btn-text)', fontWeight: 600, textDecoration: 'underline' }}
-            >
-              GitHub
-            </a>{' '}
-            under the permissive <strong>MIT License</strong>.
+            . Released under the permissive <strong>MIT License</strong>.
           </p>
 
-          <div style={{ padding: '10px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-sunken)', border: '1px solid var(--panel-border)' }}>
-            <strong style={{ display: 'block', fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
-              Open-Source Acknowledgments
-            </strong>
-            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: 'var(--muted)' }}>
-              <li>
-                <strong style={{ color: 'var(--code-text)' }}>Mermaid.js</strong> &copy; Knut Sveidqvist & contributors (MIT)
-              </li>
-              <li>
-                <strong style={{ color: 'var(--code-text)' }}>Lucide Icons</strong> &copy; Lucide Contributors (ISC)
-              </li>
-              <li>
-                <strong style={{ color: 'var(--code-text)' }}>React</strong> &copy; Meta Platforms, Inc. (MIT)
-              </li>
-            </ul>
-          </div>
-
-          <div style={{ padding: '10px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-sunken)', border: '1px solid var(--panel-border)', fontSize: '11px', color: 'var(--muted)', lineHeight: 1.5 }}>
-            <strong style={{ display: 'block', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
-              Legal & Trademark Disclaimers
-            </strong>
-            <p style={{ margin: '0 0 6px' }}>
-              • <strong>Figma</strong> is a registered trademark of Figma, Inc. Mermapix is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Figma, Inc.
-            </p>
-            <p style={{ margin: '0 0 6px' }}>
-              • <strong>Mermaid</strong> is an open-source diagramming project maintained by the Mermaid community. Mermapix is an independent tool.
-            </p>
-            <p style={{ margin: 0 }}>
-              • This software is provided &ldquo;as is&rdquo;, without warranty of any kind, express or implied.
-            </p>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', paddingTop: '10px', borderTop: '1px solid var(--panel-border)' }}>
           <a
             href="https://github.com/hisyamakbar/Mermapix"
             target="_blank"
             rel="noreferrer noopener"
+            className="action-btn action-btn-secondary"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
-              fontSize: '12px',
-              color: 'var(--btn-text)',
+              justifyContent: 'center',
+              gap: '8px',
+              width: '100%',
+              padding: '8px 14px',
+              borderRadius: 'var(--radius-sm)',
               textDecoration: 'none',
+              fontSize: '12px',
               fontWeight: 600,
+              color: 'var(--btn-text)',
             }}
           >
-            <GithubIcon size={14} />
-            <span>GitHub Repository</span>
-            <ExternalLink size={11} color="var(--muted)" />
+            <GithubIcon size={15} />
+            <span>Star &amp; View on GitHub</span>
+            <ExternalLink size={12} style={{ opacity: 0.6 }} />
           </a>
-          <button
-            type="button"
-            className="action-btn action-btn-secondary"
-            onClick={onClose}
-          >
-            Close
-          </button>
         </div>
+
+        <p
+          style={{
+            margin: '2px 0 0',
+            fontSize: '11px',
+            color: 'var(--muted)',
+            textAlign: 'center',
+            lineHeight: 1.4,
+          }}
+        >
+          Mermapix is an independent open-source tool, not affiliated with Figma, Inc.
+        </p>
       </div>
     </div>
   )

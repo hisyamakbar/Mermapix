@@ -16,9 +16,10 @@ import type { Theme } from './types/index.ts'
 const DEFAULT_DIAGRAM = DEFAULT_EXAMPLE.code
 const STORAGE_KEY = 'mermapix:code'
 const LEGACY_STORAGE_KEY = 'mermaid-code'
+const THEME_STORAGE_KEY = 'mermapix:theme'
 
-// Initial setup with light baseline
-initMermaid('light')
+// Initial setup with dark baseline
+initMermaid('dark')
 
 export default function App() {
   const [svg, setSvg] = useState('')
@@ -38,7 +39,15 @@ export default function App() {
   const [copied, setCopied] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
-  const [theme, setTheme] = useState<Theme>('light')
+  const [theme, setTheme] = useState<Theme>(() => {
+    try {
+      const stored = localStorage.getItem(THEME_STORAGE_KEY)
+      if (stored === 'light' || stored === 'dark') return stored
+      return 'dark'
+    } catch {
+      return 'dark'
+    }
+  })
   const [mobileExamplesOpen, setMobileExamplesOpen] = useState(false)
   const mobileExamplesRef = useRef<HTMLDivElement>(null)
 
@@ -133,6 +142,15 @@ export default function App() {
       // Ignore storage failures
     }
   }, [code])
+
+  // Persist theme selection across sessions
+  useEffect(() => {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme)
+    } catch {
+      // Ignore storage failures
+    }
+  }, [theme])
 
   const handleCopyToFigma = async () => {
     const success = await copyToFigma(diagramRef.current)

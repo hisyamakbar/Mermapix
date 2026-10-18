@@ -3,8 +3,8 @@
 
 :root {
   font-family: Inter, system-ui, -apple-system, sans-serif;
-  color: #1f2733;
-  background: #f8f9fb;
+  color: #f1f5f9;
+  background: #0a0f16;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -827,6 +827,8 @@ button, a {
    Developer Code Editor with Line Numbers & Syntax Highlighting
 ------------------------------------------------------------- */
 .code-editor-container {
+  --code-line-height: 20px;
+  --code-font-size: 12px;
   flex: 1;
   min-height: 280px;
   display: flex;
@@ -854,8 +856,8 @@ button, a {
 
 .code-gutter {
   flex: none;
-  width: 40px;
-  padding: 12px 6px 12px 0;
+  width: 42px;
+  padding: 12px 0;
   background: color-mix(in srgb, var(--editor-bg) 90%, var(--groove) 10%);
   border-right: 1px solid color-mix(in srgb, var(--editor-edge) 75%, transparent);
   user-select: none;
@@ -864,17 +866,19 @@ button, a {
   text-align: right;
   font-family: "JetBrains Mono", monospace;
   font-size: 11px;
-  line-height: 1.6;
+  line-height: var(--code-line-height, 20px);
   color: var(--muted);
   opacity: 0.75;
 }
 
 .gutter-line {
-  height: 1.6em;
-  padding-right: 8px;
+  height: var(--code-line-height, 20px);
+  line-height: var(--code-line-height, 20px);
+  padding: 0 8px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  box-sizing: border-box;
 }
 
 .gutter-line.is-current {
@@ -908,8 +912,8 @@ button, a {
   margin: 0;
   padding: 12px 14px;
   font-family: "JetBrains Mono", monospace;
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: var(--code-font-size, 12px);
+  line-height: var(--code-line-height, 20px);
   tab-size: 2;
   white-space: pre;
   overflow: auto;

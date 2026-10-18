@@ -77,7 +77,7 @@ export const THEME_PRESETS: Record<Theme, Record<string, string | boolean>> = {
   },
 }
 
-export function initMermaid(theme: Theme = 'light') {
+export function initMermaid(theme: Theme = 'dark') {
   mermaid.initialize({
     startOnLoad: false,
     theme: 'base',

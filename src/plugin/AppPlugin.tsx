@@ -25,8 +25,9 @@ import type { Theme } from '../types/index.ts'
 const DEFAULT_DIAGRAM = DEFAULT_EXAMPLE.code
 const STORAGE_KEY = 'mermapix:code'
 const LEGACY_STORAGE_KEY = 'mermaid-code'
+const THEME_STORAGE_KEY = 'mermapix:theme'
 
-initMermaid('light')
+initMermaid('dark')
 
 export default function AppPlugin() {
   const [svg, setSvg] = useState('')
@@ -46,7 +47,15 @@ export default function AppPlugin() {
   const [inserted, setInserted] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
-  const [theme, setTheme] = useState<Theme>('light')
+  const [theme, setTheme] = useState<Theme>(() => {
+    try {
+      const stored = localStorage.getItem(THEME_STORAGE_KEY)
+      if (stored === 'light' || stored === 'dark') return stored
+      return 'dark'
+    } catch {
+      return 'dark'
+    }
+  })
   const [examplesOpen, setExamplesOpen] = useState(false)
   const examplesRef = useRef<HTMLDivElement>(null)
 
@@ -128,6 +137,15 @@ export default function AppPlugin() {
       // Storage unavailable
     }
   }, [code])
+
+  // Persist theme selection across plugin sessions
+  useEffect(() => {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme)
+    } catch {
+      // Storage unavailable
+    }
+  }, [theme])
 
   // Insert editable layers into Figma Canvas
   const handleInsertIntoCanvas = () => {

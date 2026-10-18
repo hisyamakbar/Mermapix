@@ -1,0 +1,20 @@
+sequenceDiagram
+  autonumber
+  actor U as Customer
+  participant S as Storefront
+  participant A as Order API
+  participant P as Payment provider
+
+  U->>S: Checkout cart
+  S->>A: POST /orders
+  A-->>S: 201 Created (order_id)
+  S->>P: Create payment intent
+  alt payment succeeded
+    P-->>S: success
+    S->>A: PATCH /orders/{id} status=paid
+    S-->>U: Order confirmation
+  else payment failed
+    P-->>S: declined
+    S-->>U: Ask for another card
+  end
+  Note over A,P: Webhook keeps order and payment in sync

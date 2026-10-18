@@ -1,0 +1,12 @@
+{
+  "name": "Mermapix: Mermaid to Editable Figma",
+  "id": "1693698850206280915",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma", "figjam"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["none"]
+  }
+}

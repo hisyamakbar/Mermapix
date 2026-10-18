@@ -1,0 +1,14 @@
+flowchart TD
+  subgraph AUTH["Auth"]
+    login["Login"] --> verify{{"Verify"}}
+  end
+  subgraph APP["App"]
+    dash[["Dashboard"]] --> report[("Reports")]
+  end
+  verify -->|ok| dash
+  verify -. "retry" .-> login
+
+  classDef ok fill:#d4f4dd,stroke:#2e7d4f,color:#14321f,stroke-width:2px
+  classDef warn fill:#fdebc8,stroke:#b07d1a,color:#3d2a05
+  class dash,report ok
+  class verify warn

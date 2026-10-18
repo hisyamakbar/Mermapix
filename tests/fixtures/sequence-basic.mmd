@@ -1,0 +1,9 @@
+sequenceDiagram
+  participant U as User
+  participant W as Web app
+  participant A as API
+  U->>W: Paste Mermaid code
+  W->>A: Validate
+  A-->>W: OK
+  Note over W: Render preview
+  W-->>U: Copy to Figma

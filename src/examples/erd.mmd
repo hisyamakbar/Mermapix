@@ -1,0 +1,49 @@
+erDiagram
+  CUSTOMER ||--o{ ORDER : places
+  ORDER ||--|{ ORDER_ITEM : contains
+  PRODUCT ||--o{ ORDER_ITEM : "ordered as"
+  CATEGORY ||--o{ PRODUCT : groups
+  CATEGORY |o--o{ CATEGORY : "parent of"
+  ORDER ||--o| PAYMENT : "paid by"
+
+  CUSTOMER {
+    uuid id PK
+    string email UK "login, unique"
+    string full_name
+    string phone "optional"
+    timestamp created_at
+  }
+  ORDER {
+    uuid id PK
+    uuid customer_id FK
+    string status "pending / paid / shipped"
+    decimal total_amount
+    timestamp placed_at
+  }
+  ORDER_ITEM {
+    uuid order_id PK, FK
+    uuid product_id PK, FK
+    int quantity
+    decimal unit_price "price at checkout"
+  }
+  PRODUCT {
+    uuid id PK
+    uuid category_id FK
+    string sku UK
+    string name
+    decimal price
+    int stock
+  }
+  CATEGORY {
+    uuid id PK
+    uuid parent_id FK "null for root"
+    string name
+    string slug UK
+  }
+  PAYMENT {
+    uuid id PK
+    uuid order_id FK, UK
+    string provider "stripe / paypal"
+    decimal amount
+    timestamp paid_at
+  }

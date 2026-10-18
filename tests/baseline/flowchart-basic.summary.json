@@ -1,0 +1,45 @@
+{
+  "elements": {
+    "g": 36,
+    "rect": 17,
+    "path": 12,
+    "polygon": 3,
+    "circle": 4,
+    "line": 0,
+    "text": 10,
+    "tspan": 8,
+    "foreignObject": 0,
+    "style": 0
+  },
+  "hasClassAttr": false,
+  "hasStyleAttr": false,
+  "texts": [
+    "App",
+    "Auth",
+    "ok",
+    "retry",
+    "Login",
+    "Verify",
+    "Dashboard",
+    "Reports"
+  ],
+  "fills": [
+    "none",
+    "rgb(138, 148, 166)",
+    "rgb(20, 50, 31)",
+    "rgb(212, 244, 221)",
+    "rgb(238, 241, 245)",
+    "rgb(244, 246, 249)",
+    "rgb(253, 235, 200)",
+    "rgb(255, 255, 255)",
+    "rgb(31, 39, 51)",
+    "rgb(61, 42, 5)"
+  ],
+  "strokes": [
+    "none",
+    "rgb(138, 148, 166)",
+    "rgb(176, 125, 26)",
+    "rgb(200, 205, 214)",
+    "rgb(46, 125, 79)"
+  ]
+}

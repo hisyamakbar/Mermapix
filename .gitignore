@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Production builds
+dist/
+dist-plugin/
+dist-oss/
+build/
+
+# Vite and compiler caches
+.cache/
+.vite/
+vite.config.*.timestamp-*
+*.tsbuildinfo
+
+# Environment & local secrets
+.env*
+*.local
+
+# Logs and debug files
+logs/
+*.log
+*-debug.log*
+.claude-replay.*
+.tmp-*
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Test outputs
+tests/output/
+
+# Internal AI assistant configurations & skills (Private)
+.agents/
+.claude/
+skills-lock.json
+plans/
+scratch/
+
+

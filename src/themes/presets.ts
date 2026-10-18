@@ -1,0 +1,98 @@
+import mermaid from 'mermaid'
+import type { Theme } from '../types/index.ts'
+
+export const THEME_PRESETS: Record<Theme, Record<string, string | boolean>> = {
+  light: {
+    primaryColor: '#f8fafc',
+    primaryTextColor: '#09090b',
+    primaryBorderColor: '#e4e4e7',
+    lineColor: '#e4e4e7',
+    secondaryColor: '#ffffff',
+    tertiaryColor: '#ffffff',
+    background: '#ffffff',
+    mainBkg: '#f8fafc',
+    nodeBorder: '#e4e4e7',
+    nodeTextColor: '#09090b',
+    textColor: '#09090b',
+    clusterBkg: '#fafafa',
+    clusterBorder: '#e4e4e7',
+    titleColor: '#09090b',
+    edgeLabelBackground: '#ffffff',
+    attributeBackgroundColorOdd: '#ffffff',
+    attributeBackgroundColorEven: '#fafafa',
+    // Sequence diagram variables
+    actorBkg: '#f8fafc',
+    actorBorder: '#e4e4e7',
+    actorTextColor: '#09090b',
+    actorLineColor: '#e4e4e7',
+    signalColor: '#e4e4e7',
+    signalTextColor: '#09090b',
+    labelBoxBkgColor: '#f8fafc',
+    labelBoxBorderColor: '#e4e4e7',
+    labelTextColor: '#09090b',
+    loopTextColor: '#09090b',
+    noteBkgColor: '#fef9c3',
+    noteBorderColor: '#fde047',
+    noteTextColor: '#713f12',
+    activationBorderColor: '#e4e4e7',
+    activationBkgColor: '#f8fafc',
+    sequenceNumberColor: '#ffffff',
+  },
+  dark: {
+    darkMode: true,
+    primaryColor: '#1e293b',
+    primaryTextColor: '#f8fafc',
+    primaryBorderColor: '#38bdf8',
+    lineColor: '#38bdf8',
+    secondaryColor: '#0f172a',
+    tertiaryColor: '#1e293b',
+    background: '#090d16',
+    mainBkg: '#1e293b',
+    nodeBorder: '#38bdf8',
+    nodeTextColor: '#f8fafc',
+    textColor: '#f8fafc',
+    clusterBkg: '#0f172a',
+    clusterBorder: '#1e293b',
+    titleColor: '#f8fafc',
+    edgeLabelBackground: '#1e293b',
+    attributeBackgroundColorOdd: '#1e293b',
+    attributeBackgroundColorEven: '#131b2e',
+    // Sequence diagram variables
+    actorBkg: '#1e293b',
+    actorBorder: '#38bdf8',
+    actorTextColor: '#f8fafc',
+    actorLineColor: '#475569',
+    signalColor: '#38bdf8',
+    signalTextColor: '#f8fafc',
+    labelBoxBkgColor: '#0f172a',
+    labelBoxBorderColor: '#38bdf8',
+    labelTextColor: '#f8fafc',
+    loopTextColor: '#f8fafc',
+    noteBkgColor: '#1e1b4b',
+    noteBorderColor: '#818cf8',
+    noteTextColor: '#e0e7ff',
+    activationBorderColor: '#38bdf8',
+    activationBkgColor: '#1e293b',
+    sequenceNumberColor: '#090d16',
+  },
+}
+
+export function initMermaid(theme: Theme = 'light') {
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'base',
+    // Must be set at the top level (not only under `flowchart`) or Mermaid still
+    // renders node labels as HTML inside <foreignObject>, which Figma cannot import.
+    htmlLabels: false,
+    themeVariables: {
+      ...THEME_PRESETS[theme],
+      fontFamily: 'Inter, system-ui, sans-serif',
+      fontSize: '13px',
+    },
+    flowchart: {
+      htmlLabels: false,
+      curve: 'basis',
+      padding: 20,
+    },
+  })
+}

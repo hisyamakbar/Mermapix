@@ -1,0 +1,75 @@
+flowchart TD
+  subgraph S1["1.0 Home"]
+    n10["1.0 Home"]
+  end
+
+  subgraph S2["2.0 Company"]
+    n20[["2.0 Company"]]
+    n20 --> n21["2.1 About Us"]
+    n20 --> n22[("2.2 Team")]
+    n22 --> n221[/"2.2.1 Profile Template"/]
+    n20 --> n23["2.3 Careers"]
+    n20 --> n24["2.4 Contact"]
+  end
+
+  subgraph S3["3.0 Products"]
+    n30[["3.0 Products"]]
+    n30 --> n31["3.1 Product A"]
+    n30 --> n32["3.2 Product B"]
+    n30 --> n33[["3.3 Pricing"]]
+    n33 --> n331["3.3.1 Plans"]
+    n33 --> n332["3.3.2 FAQ"]
+  end
+
+  subgraph S4["4.0 Blog"]
+    n40[("4.0 Blog")]
+    n40 --> n41[/"4.1 Post Template"/]
+    n40 --> n42{{"4.2 Categories"}}
+  end
+
+  subgraph S5["5.0 Support"]
+    n50[["5.0 Support"]]
+    n50 --> n51["5.1 Help Center"]
+    n50 --> n52>"5.2 Status Page"]
+  end
+
+  subgraph S9["9.0 System and utility"]
+    n91["9.1 Privacy Policy"]
+    n92(("9.2 Thank You"))
+    n93(("9.3 404 Page"))
+    n94(("9.4 Search Results"))
+  end
+
+  subgraph LEG["Legend"]
+    direction LR
+    lg1["Shape - static page"]
+    lg2[["Shape - section landing"]]
+    lg3[("Shape - archive")]
+    lg4[/"Shape - single template"/]
+    lg5{{"Shape - taxonomy"}}
+    lg6(("Shape - system page"))
+    lg7>"Shape - external link"]
+    lc1["Colour - new"]
+    lc2["Colour - merged"]
+    lc3["Colour - kept"]
+    lc4["Outline - plugin template"]
+    lc5["Outline - gated"]
+  end
+
+  n10 --> n20
+  n10 --> n30
+  n10 --> n40
+  n10 --> n50
+  n40 -. "featured on homepage" .-> n10
+
+  classDef new fill:#d4f4dd,stroke:#2e7d4f,color:#14321f,stroke-width:2px
+  classDef merged fill:#fdebc8,stroke:#b07d1a,color:#3d2a05,stroke-width:2px
+  classDef kept fill:#eef1f5,stroke:#8a94a6,color:#1f2733
+  classDef pluginui stroke:#7b3fbf,stroke-width:3px
+  classDef gated stroke-dasharray: 6 4,stroke-width:3px
+
+  class n40,n41,n42,n92,n93,lc1 new
+  class n10,n21,n33,n51,lc2 merged
+  class n20,n22,n221,n23,n24,n30,n31,n32,n331,n332,n50,n52,n91,n94,lg1,lg2,lg3,lg4,lg5,lg6,lg7,lc3 kept
+  class n41,n42,lc4 pluginui
+  class n332,lc5 gated

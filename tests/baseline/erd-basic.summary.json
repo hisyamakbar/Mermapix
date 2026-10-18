@@ -1,0 +1,60 @@
+{
+  "elements": {
+    "g": 118,
+    "rect": 41,
+    "path": 60,
+    "polygon": 0,
+    "circle": 4,
+    "line": 0,
+    "text": 41,
+    "tspan": 30,
+    "foreignObject": 0,
+    "style": 0
+  },
+  "hasClassAttr": false,
+  "hasStyleAttr": false,
+  "texts": [
+    "places",
+    "contains",
+    "CUSTOMER",
+    "int",
+    "id",
+    "PK",
+    "string",
+    "email",
+    "UK",
+    "string",
+    "full_name",
+    "ORDER",
+    "int",
+    "id",
+    "PK",
+    "int",
+    "customer_id",
+    "FK",
+    "date",
+    "placed_at",
+    "ORDER_ITEM",
+    "int",
+    "order_id",
+    "PK,FK",
+    "int",
+    "line_no",
+    "PK",
+    "decimal",
+    "price",
+    "unit price"
+  ],
+  "fills": [
+    "none",
+    "rgb(138, 148, 166)",
+    "rgb(238, 241, 245)",
+    "rgb(254, 254, 254)",
+    "rgb(255, 255, 255)",
+    "rgb(31, 39, 51)"
+  ],
+  "strokes": [
+    "none",
+    "rgb(138, 148, 166)"
+  ]
+}

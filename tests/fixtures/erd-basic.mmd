@@ -1,0 +1,19 @@
+erDiagram
+  CUSTOMER ||--o{ ORDER : places
+  ORDER ||--|{ ORDER_ITEM : contains
+
+  CUSTOMER {
+    int id PK
+    string email UK
+    string full_name
+  }
+  ORDER {
+    int id PK
+    int customer_id FK
+    date placed_at
+  }
+  ORDER_ITEM {
+    int order_id PK, FK
+    int line_no PK
+    decimal price "unit price"
+  }

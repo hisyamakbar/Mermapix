@@ -462,7 +462,7 @@
 			primaryColor: "#f8fafc",
 			primaryTextColor: "#09090b",
 			primaryBorderColor: "#e4e4e7",
-			lineColor: "#e4e4e7",
+			lineColor: "#71717a",
 			secondaryColor: "#ffffff",
 			tertiaryColor: "#ffffff",
 			background: "#ffffff",

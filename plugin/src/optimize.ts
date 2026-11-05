@@ -2,7 +2,7 @@
 //
 // Pipeline (order matters and must stay identical):
 //   1. purgeJunkNodes        - drop ghost/empty layers
-//   2. DIAGRAM_STEPS         - per-diagram-type conversions (ERD tables, flowchart nodes/subgraphs/connectors)
+//   2. DIAGRAM_STEPS         - per-diagram-type conversions (ERD tables, flowchart nodes/subgraphs/connectors, sequence)
 //   3. flattenWrappers       - dissolve redundant wrapper groups (5 passes, each followed by a purge)
 //   4. elevateSequenceNumbers
 //   5. unwrapRootGroup
@@ -17,6 +17,7 @@ import { convertFlowchartNodes } from './flowchart.ts'
 import { convertClusters, nestIntoClusters } from './subgraphs.ts'
 import { arrangeFlowchart } from './connectors.ts'
 import { convertEdgeLabels } from './edgeLabels.ts'
+import { convertSequence } from './sequence.ts'
 import { parseColorToFigma } from './theme.ts'
 import {
   purgeJunkNodes,
@@ -47,6 +48,21 @@ const flowchartStep: DiagramStep = {
   },
 }
 
+/**
+ * Sequence diagrams (Phase 8.4): participants, actors, notes, activations, blocks and messages become
+ * frames / groups. Runs only when lifeline vectors (`actorN`) exist, so other diagram types are untouched.
+ */
+const sequenceStep: DiagramStep = {
+  name: 'sequence',
+  run: (rootNode) => {
+    try {
+      convertSequence(rootNode)
+    } catch {
+      // A failure must never abort the insert: the partially converted tree is still valid Figma content.
+    }
+  },
+}
+
 /** Edge/relationship labels of every diagram type; must run after the node/table steps. */
 const edgeLabelStep: DiagramStep = {
   name: 'edge-labels',
@@ -67,7 +83,7 @@ const connectorsStep: DiagramStep = {
 }
 
 /** Per-diagram-type steps, executed in order between the initial purge and the generic cleanup. */
-export const DIAGRAM_STEPS: DiagramStep[] = [erdStep, flowchartStep, edgeLabelStep, connectorsStep]
+export const DIAGRAM_STEPS: DiagramStep[] = [erdStep, flowchartStep, sequenceStep, edgeLabelStep, connectorsStep]
 
 /**
  * Figma imports the SVG root as a frame whose white fill is not shown (canvas shows through),

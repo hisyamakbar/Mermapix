@@ -74,7 +74,7 @@ for (const theme of THEME_NAMES) {
       for (const k of 'rgb') assert.ok(near(root.fills[0].color[k], want[k], 1e-6), `${k}`)
     })
 
-    test(`[${example}/${theme}] connectors (L_* / id_entity edges) keep path + bounds (8.3 renames flowchart lines to "Line")`, async () => {
+    test(`[${example}/${theme}] connectors (L_* / id_entity edges) keep path + bounds (8.3 renames flowchart lines to "Line")`, { skip: example.includes('sequence') && 'sequence message lines are covered by plugin-sequence.test.mjs (phase 8.4)' }, async () => {
       const { before, root } = await load(example, theme)
       const edges = (tree) => all(tree, (n) => n.type === 'VECTOR' && /(^|-)L_|id_entity|cyclic-special/.test(n.name))
       const b = edges(before)
@@ -205,9 +205,9 @@ for (const theme of THEME_NAMES) {
     }
   })
 
-  test(`[sequence/${theme}] sequence diagrams are left to phase 8.4: no frames except the root`, async () => {
+  test(`[sequence/${theme}] sequence diagrams get frames now (phase 8.4); the full structure is asserted in plugin-sequence.test.mjs`, async () => {
     const { root } = await load('3-ex-sequence', theme)
-    assert.equal(all(root, (n) => n.type === 'FRAME' && n !== root).length, 0)
+    assert.ok(all(root, (n) => n.type === 'FRAME' && n !== root).length > 0)
   })
 }
 

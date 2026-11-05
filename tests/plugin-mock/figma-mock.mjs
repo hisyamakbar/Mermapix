@@ -17,6 +17,15 @@ export class MockNode {
     this.name = props.name ?? { TEXT: 'Text', VECTOR: 'Vector', GROUP: 'Group' }[type] ?? 'Frame'
     this.x = props.x ?? 0
     this.y = props.y ?? 0
+    if (type === 'GROUP') {
+      // Like Figma: a GROUP has no coordinate space of its own, moving it moves its contents.
+      // (Frame children are frame-relative so a moved FRAME leaves them untouched.)
+      let gx = this.x, gy = this.y
+      const shift = (n, dx, dy) => { n.x += dx; n.y += dy }
+      Object.defineProperty(this, 'x', { enumerable: true, get: () => gx, set: (v) => { const d = v - gx; gx = v; if (d) for (const c of this.children) shift(c, d, 0) } })
+      Object.defineProperty(this, 'y', { enumerable: true, get: () => gy, set: (v) => { const d = v - gy; gy = v; if (d) for (const c of this.children) shift(c, 0, d) } })
+      this.setBoundsRaw = (x, y, w, h) => { gx = x; gy = y; this.width = w; this.height = h }
+    }
     this.width = props.width ?? 0
     this.height = props.height ?? 0
     this.removed = false
@@ -39,7 +48,12 @@ export class MockNode {
       let font = { family: 'Arial', style: 'Regular' }
       let auto = 'NONE'
       let size = props.fontSize ?? 12
-      const measure = () => { this.width = textWidth(this.characters, font, size); this.height = textHeight(this.characters, size) }
+      let lh = null
+      const measure = () => {
+        this.width = textWidth(this.characters, font, size)
+        this.height = lh && lh.unit === 'PIXELS' ? lh.value * Math.max(1, String(this.characters).split('\n').length) : textHeight(this.characters, size)
+      }
+      Object.defineProperty(this, 'lineHeight', { enumerable: true, get: () => lh, set: (v) => { lh = v; if (auto === 'WIDTH_AND_HEIGHT') measure() } })
       Object.defineProperty(this, 'fontName', { enumerable: true, get: () => font, set: (f) => { font = f; if (auto === 'WIDTH_AND_HEIGHT') measure() } })
       Object.defineProperty(this, 'fontSize', { enumerable: true, get: () => size, set: (v) => { size = v; if (auto === 'WIDTH_AND_HEIGHT') measure() } })
       Object.defineProperty(this, 'textAutoResize', { enumerable: true, get: () => auto, set: (v) => { auto = v; if (v === 'WIDTH_AND_HEIGHT') measure() } })
@@ -90,7 +104,7 @@ export async function runPlugin(codePath, svg, buildScene, extraMsg = {}) {
       const g = new MockNode(env, 'GROUP')
       const x0 = Math.min(...nodes.map((n) => n.x)), y0 = Math.min(...nodes.map((n) => n.y))
       const x1 = Math.max(...nodes.map((n) => n.x + n.width)), y1 = Math.max(...nodes.map((n) => n.y + n.height))
-      Object.assign(g, { x: x0, y: y0, width: x1 - x0, height: y1 - y0 })
+      g.setBoundsRaw(x0, y0, x1 - x0, y1 - y0)
       parent.insertChild(index ?? parent.children.length, g)
       for (const n of nodes) g.appendChild(n)
       return g

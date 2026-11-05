@@ -1,0 +1,63 @@
+sequenceDiagram
+  autonumber
+  actor U as Customer
+  participant W as Web App
+  participant API
+  participant DB as Database
+  participant PSP as Payment Provider
+
+  U->>W: Open cart
+  activate W
+  W->>API: POST /orders
+  activate API
+  API->>API: Validate stock
+  API->>+DB: INSERT order
+  DB-->>-API: order_id
+  Note right of DB: Row locked until commit
+  Note left of U: Guest checkout
+  Note over API,PSP: Idempotency key required
+  Note over W,API: Two lines of text<br/>stay two lines
+
+  loop Retry up to 3 times
+    API-)PSP: Charge card
+    PSP--)API: pending
+  end
+
+  alt payment succeeded
+    PSP-->>API: success
+    opt Send receipt
+      API->>W: Receipt link
+    end
+  else payment failed
+    PSP-->>API: declined
+    loop Every minute
+      API-xW: Retry notice
+    end
+  end
+
+  par Notify customer
+    API->>U: Email confirmation
+  and Update stock
+    API->>DB: UPDATE stock
+  and Audit
+    API->>W: Audit ping
+  end
+
+  critical Capture funds
+    API->>PSP: Capture
+  option Timeout
+    API-->>W: Capture delayed
+  option Network error
+    API-->>W: Capture failed
+  end
+
+  break Customer cancelled
+    API->>W: Cancel order
+  end
+
+  rect rgb(40, 60, 90)
+    W->>U: Show summary
+    Note over U,W: Highlighted section
+  end
+  deactivate API
+  deactivate W

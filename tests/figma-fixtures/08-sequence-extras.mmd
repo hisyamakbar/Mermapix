@@ -1,0 +1,13 @@
+sequenceDiagram
+  title Extras
+  box Purple Team
+    participant A
+    participant B
+  end
+  participant D@{ "type" : "database" }
+  A->>B: one
+  B->>D: two
+  create participant C
+  A->>C: new
+  destroy C
+  C-->>A: bye

@@ -353,14 +353,31 @@ export function importSvg(env, svgText) {
       if (g.children.length) {
         const bs = g.children
         const x0 = Math.min(...bs.map((c) => c.x)), y0 = Math.min(...bs.map((c) => c.y))
-        g.x = x0; g.y = y0
-        g.width = Math.max(...bs.map((c) => c.x + c.width)) - x0
-        g.height = Math.max(...bs.map((c) => c.y + c.height)) - y0
+        g.setBoundsRaw(x0, y0, Math.max(...bs.map((c) => c.x + c.width)) - x0, Math.max(...bs.map((c) => c.y + c.height)) - y0)
       }
     } else if (tag === 'rect') {
       const x = num(own.x), y = num(own.y), w = num(own.width), h = num(own.height)
       if (w <= 0 || h <= 0) return
-      vector(parentNode, el, style, m, [['M', x, y], ['L', x + w, y], ['L', x + w, y + h], ['L', x, y + h], ['L', x, y], ['Z']])
+      let rx = num(own.rx, NaN), ry = num(own.ry, NaN)
+      if (!Number.isFinite(rx) && Number.isFinite(ry)) rx = ry
+      if (!Number.isFinite(ry) && Number.isFinite(rx)) ry = rx
+      rx = Math.min(Math.max(rx || 0, 0), w / 2); ry = Math.min(Math.max(ry || 0, 0), h / 2)
+      if (rx > 0 && ry > 0) {
+        // Rounded rect like Figma's importer: straight edges + one cubic per corner (kappa 0.5523).
+        const kx = 0.5523 * rx, ky = 0.5523 * ry
+        vector(parentNode, el, style, m, [
+          ['M', x + rx, y], ['L', x + w - rx, y],
+          ['C', x + w - rx + kx, y, x + w, y + ry - ky, x + w, y + ry],
+          ['L', x + w, y + h - ry],
+          ['C', x + w, y + h - ry + ky, x + w - rx + kx, y + h, x + w - rx, y + h],
+          ['L', x + rx, y + h],
+          ['C', x + rx - kx, y + h, x, y + h - ry + ky, x, y + h - ry],
+          ['L', x, y + ry],
+          ['C', x, y + ry - ky, x + rx - kx, y, x + rx, y], ['Z'],
+        ])
+      } else {
+        vector(parentNode, el, style, m, [['M', x, y], ['L', x + w, y], ['L', x + w, y + h], ['L', x, y + h], ['L', x, y], ['Z']])
+      }
     } else if (tag === 'path') {
       if (!own.d) return
       vector(parentNode, el, style, m, parsePathD(own.d))
@@ -368,7 +385,8 @@ export function importSvg(env, svgText) {
       const pts = (own.points || '').trim().split(/[\s,]+/).map(Number)
       const cmds = []
       for (let i = 0; i + 1 < pts.length; i += 2) cmds.push([i ? 'L' : 'M', pts[i], pts[i + 1]])
-      if (tag === 'polygon') cmds.push(['Z'])
+      // Figma's importer closes a polygon with an explicit line back to the start point, then Z.
+      if (tag === 'polygon') { cmds.push(['L', pts[0], pts[1]]); cmds.push(['Z']) }
       vector(parentNode, el, style, m, cmds)
     } else if (tag === 'circle' || tag === 'ellipse') {
       const cx = num(own.cx), cy = num(own.cy)

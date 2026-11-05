@@ -1,4 +1,5 @@
 import { markerLayerName, isShapeLayerName, isConnectorLayerName } from './naming.ts'
+import { isSequenceGroupName } from './sequenceGeometry.ts'
 
 // Generic layer cleanup passes shared by all diagram types.
 // Each function mutates the Figma node tree rooted at `rootNode` in place.
@@ -76,7 +77,9 @@ export function dissolveRedundantWrappers(parent: any): void {
         name.includes('marker') ||
         // Phase 8.3 structure: edge groups may hold a single line and must stay a group
         name.startsWith('edge: ') ||
-        name === 'connectors'
+        name === 'connectors' ||
+        // Phase 8.4 structure: sequence strata and message groups
+        isSequenceGroupName(name)
 
       // Dissolve if it's a generic wrapper OR a single-child group that isn't a protected node
       if ((isGeneric || isSingleChild) && !isProtectedNode) {
@@ -104,6 +107,16 @@ export function flattenWrappers(rootNode: any): void {
   }
 }
 
+/** Phase 8.4: a number that already sits inside its `Badge <n>` frame is in the right place. */
+function isInsideBadge(parent: any): boolean {
+  if (!parent || parent.type !== 'FRAME' || typeof parent.getPluginData !== 'function') return false
+  try {
+    return parent.getPluginData('mermapix:kind') === 'Sequence Badge'
+  } catch {
+    return false
+  }
+}
+
 /** Pass 4b: ensure sequence number text layers are never occluded by badge vector circles. */
 export function elevateSequenceNumbers(parent: any): void {
   if (!parent || parent.removed || !('children' in parent)) return
@@ -115,7 +128,7 @@ export function elevateSequenceNumbers(parent: any): void {
   for (const child of [...parent.children]) {
     if (child && !child.removed && child.type === 'TEXT') {
       const text = (child.characters || '').trim()
-      if (/^[0-9]{1,3}$/.test(text) && child.width <= 24 && child.height <= 24) {
+      if (/^[0-9]{1,3}$/.test(text) && child.width <= 24 && child.height <= 24 && !isInsideBadge(parent)) {
         try {
           parent.appendChild(child)
         } catch {}

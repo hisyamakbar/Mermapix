@@ -11,6 +11,7 @@
     "build:plugin": "node scripts/build-plugin.mjs",
     "export:oss": "node scripts/export-clean-oss.mjs",
     "test:export": "node tests/export-svg.mjs --out tests/output --compare tests/baseline",
+    "test:colors": "node tests/color-audit.mjs",
     "test:unit": "node --experimental-strip-types --no-warnings --test tests/unit/*.test.mjs"
   },
   "dependencies": {

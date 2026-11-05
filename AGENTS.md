@@ -38,6 +38,7 @@ Mermapix/
 │   │   ├── CanvasEmptyState.tsx    # 3-step onboarding card with sample loader
 │   │   ├── ImportModal.tsx         # DBML & SQL schema import modal with table naming options
 │   │   ├── AboutModal.tsx          # About dialog with open source licenses and disclaimers
+│   │   ├── MermapixLogo.tsx        # Brand lockup: inline SVG (icon as ?inline WebP data URL + wordmark paths)
 │   │   └── mermaidHighlighter.ts   # Syntax token parser for Mermaid code
 │   ├── converters/                 # Schema to Mermaid ERD parsers
 │   │   ├── dbml.ts                 # DBML parser (tables, columns, types, keys, refs)
@@ -45,6 +46,8 @@ Mermapix/
 │   │   ├── utils.ts                # Table naming transforms and Mermaid ERD serializer
 │   │   ├── types.ts                # AST definitions for schemas, tables, and relations
 │   │   └── index.ts                # Converter barrel export
+│   ├── assets/
+│   │   └── mermapix-icon-96.webp   # 96px brand icon, inlined as base64 so it works in the single-file plugin UI
 │   ├── export/
 │   │   └── svg.ts                  # SVG normalization, foreignObject removal, Figma layer preparation
 │   ├── hooks/
@@ -80,9 +83,13 @@ Mermapix/
 │   ├── assets/                     # Publishing visual assets (icon-128.png, cover-1920x1080.png)
 │   └── PUBLISHING_GUIDE.md         # Official community publishing checklist and form
 ├── public/                         # Static assets served at root
-│   ├── favicon.svg                 # SVG favicon
-│   ├── og-image.jpg                # OpenGraph social preview image
-│   └── logo/                       # Brand logo vectors (light, dark, icon)
+│   ├── favicon.ico                 # 16/32/48 favicon (PNG-compressed entries)
+│   ├── favicon-32.png              # PNG favicon
+│   ├── apple-touch-icon.png        # 180x180 opaque iOS home-screen icon (squircle on brand pink)
+│   ├── icon-192.png / icon-512.png # PWA/manifest icons
+│   ├── site.webmanifest            # Web app manifest (theme/background #090d16)
+│   ├── og-image.jpg                # OpenGraph social preview image (1200x630)
+│   └── logo/                       # mermapix-icon.png (256px) + light/dark wordmark lockup SVGs (embedded WebP icon)
 ├── tests/                          # Test harness & fixtures
 │   ├── plugin-mock/                # In-memory mock Figma + synthetic ERD scene used by tests/unit/plugin-harness.test.mjs
 │   ├── export-svg.mjs              # Headless Chrome regression runner via CDP
@@ -105,7 +112,7 @@ Mermapix/
 2. **Plugin Auto Layout Engine**: In `plugin/src/` (`optimize.ts`, `erd.ts`, `cleanup.ts`), preserve `optimizeDiagramNodes` which converts ERD tables into native vertical Auto Layout frames and dissolves redundant nested wrapper groups.
 3. **Theme Synchronization**: The diagram appearance is directly synchronized with the UI theme (`light` and `dark`). Light mode renders clean neutral cards; dark mode renders midnight cyan cards.
 4. **Mobile Layout Architecture**: Mobile uses a streamlined 2-row layout: Row 1 = Brand + compact theme/export/copy actions; Row 2 = Tab switcher + quick tool icons. Do not introduce a cluttered 3rd row.
-5. **Static Assets**: All public-facing static assets (logos, favicon, og-image) reside in `public/` and are referenced from `/logo/...` or root.
+5. **Static Assets**: All public-facing static assets (logos, favicon, og-image) reside in `public/` and are referenced from `/logo/...` or root. Assets used inside the Figma plugin UI (e.g. the logo icon) must instead be imported with `?inline` from `src/assets/`, because `plugin/ui.html` is a single file and `/logo/...` URLs do not resolve there.
 6. **One Phase Per Session**: Work on one phase at a time per session and update the checklist in `plans/mermapix-plan.md`.
 
 ## Dependencies

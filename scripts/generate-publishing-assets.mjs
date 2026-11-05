@@ -10,6 +10,12 @@ const __dirname = path.dirname(__filename)
 const rootDir = path.resolve(__dirname, '..')
 const assetsDir = path.resolve(rootDir, 'plugin/assets')
 
+// Brand icon raster (256x256 PNG, glossy pink squircle with transparent corners).
+// Embedded as a data URL so the headless page needs no file access.
+const iconDataUrl = `data:image/png;base64,${fs
+  .readFileSync(path.resolve(rootDir, 'public/logo/mermapix-icon.png'))
+  .toString('base64')}`
+
 if (!fs.existsSync(assetsDir)) {
   fs.mkdirSync(assetsDir, { recursive: true })
 }
@@ -101,17 +107,15 @@ async function main() {
       justify-content: center;
       background: transparent;
     }
-    svg {
+    img {
       width: 128px;
       height: 128px;
+      display: block;
     }
   </style>
 </head>
 <body>
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-    <path fill="#D1336A" d="M204.80 0.00L307.20 0.00C479.23 0.00 512.00 32.77 512.00 204.80L512.00 307.20C512.00 479.23 479.23 512.00 307.20 512.00L204.80 512.00C32.77 512.00 0.00 479.23 0.00 307.20L0.00 204.80C0.00 32.77 32.77 0.00 204.80 0.00Z"/>
-    <path fill="#FFFFFF" d="M281.68 122.80L395.66 122.80C409.01 122.80 419.84 133.62 419.84 146.98C419.84 160.33 409.01 171.15 395.66 171.15L330.03 171.15L330.03 202.24L368.03 202.24C381.38 202.24 392.21 213.07 392.21 226.42C392.21 239.77 381.38 250.60 368.03 250.60L330.03 250.60L330.03 307.59C330.03 357.19 289.83 397.39 240.23 397.39C190.63 397.39 150.42 357.19 150.42 307.59L150.42 281.68C114.48 266.90 92.16 230.63 95.16 191.88C124.16 200.20 151.18 214.30 174.60 233.33C198.02 214.30 225.04 200.20 254.05 191.88C257.04 230.63 234.72 266.90 198.78 281.68L198.78 307.59C198.78 330.48 217.34 349.04 240.23 349.04C263.12 349.04 281.68 330.48 281.68 307.59Z"/>
-  </svg>
+  <img src="${iconDataUrl}" width="128" height="128" alt="">
 </body>
 </html>`
 
@@ -194,8 +198,7 @@ async function main() {
     .logo-icon {
       width: 64px;
       height: 64px;
-      border-radius: 16px;
-      box-shadow: 0 8px 32px rgba(209, 51, 106, 0.4);
+      filter: drop-shadow(0 8px 24px rgba(209, 51, 106, 0.4));
     }
     h1 {
       font-size: 64px;
@@ -368,10 +371,7 @@ async function main() {
   <header>
     <div class="badge">✦ Native Figma Plugin</div>
     <div class="brand-row">
-      <svg class="logo-icon" viewBox="0 0 512 512">
-        <path fill="#D1336A" d="M204.80 0.00L307.20 0.00C479.23 0.00 512.00 32.77 512.00 204.80L512.00 307.20C512.00 479.23 479.23 512.00 307.20 512.00L204.80 512.00C32.77 512.00 0.00 479.23 0.00 307.20L0.00 204.80C0.00 32.77 32.77 0.00 204.80 0.00Z"/>
-        <path fill="#FFFFFF" d="M281.68 122.80L395.66 122.80C409.01 122.80 419.84 133.62 419.84 146.98C419.84 160.33 409.01 171.15 395.66 171.15L330.03 171.15L330.03 202.24L368.03 202.24C381.38 202.24 392.21 213.07 392.21 226.42C392.21 239.77 381.38 250.60 368.03 250.60L330.03 250.60L330.03 307.59C330.03 357.19 289.83 397.39 240.23 397.39C190.63 397.39 150.42 357.19 150.42 307.59L150.42 281.68C114.48 266.90 92.16 230.63 95.16 191.88C124.16 200.20 151.18 214.30 174.60 233.33C198.02 214.30 225.04 200.20 254.05 191.88C257.04 230.63 234.72 266.90 198.78 281.68L198.78 307.59C198.78 330.48 217.34 349.04 240.23 349.04C263.12 349.04 281.68 330.48 281.68 307.59Z"/>
-      </svg>
+      <img class="logo-icon" src="${iconDataUrl}" alt="">
       <h1>Mermapix</h1>
     </div>
     <p class="subtitle">

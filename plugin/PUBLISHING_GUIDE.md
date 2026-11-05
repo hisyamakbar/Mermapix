@@ -11,7 +11,7 @@ A comprehensive, step-by-step guide for publishing the **Mermapix: Mermaid to Ed
 - [x] **Clean Layers (No Redundant Groups)**: The optimizer dissolves intermediate wrapper groups so users can double-click and edit text immediately without deep drilling.
 - [x] **Figma Trademark Compliance**: The listing title is **"Mermapix: Mermaid to Editable Figma"** (brand name "Mermapix" is leading, never prefixed with "Figma"). Logos and iconography are original and do not mimic official Figma brand assets.
 - [x] **Visual Assets Prepared**:
-  - Icon: `plugin/assets/icon-128.png` (128x128 px, PNG format)
+  - Icon: `plugin/assets/icon-128.png` (128x128 px, PNG format; downscaled from the brand icon master `public/logo/mermapix-icon.png`)
   - Cover Banner: `plugin/assets/cover-1920x1080.png` (1920x1080 px, 16:9 PNG format)
 - [x] **Multi-Editor Support**: Ready for both **Figma Design** and **FigJam** (`"editorType": ["figma", "figjam"]`).
 

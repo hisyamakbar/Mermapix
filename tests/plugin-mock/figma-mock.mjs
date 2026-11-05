@@ -7,8 +7,7 @@
 import vm from 'node:vm'
 import fs from 'node:fs'
 
-const PER_CHAR = { Arial: 6, 'Inter/Regular': 7, 'Inter/Bold': 7.5 }
-const perChar = (font) => PER_CHAR[font.family === 'Inter' ? `Inter/${font.style}` : font.family] ?? 6
+import { textWidth, textHeight } from './text-metrics.mjs'
 
 export class MockNode {
   constructor(env, type, props = {}) {
@@ -24,6 +23,12 @@ export class MockNode {
     this.parent = null
     this.visible = true
     if (type === 'FRAME' || type === 'GROUP') this.children = []
+    if (type === 'FRAME') {
+      this.fills = props.fills ?? []
+      this.strokes = props.strokes ?? []
+      this.layoutMode = 'NONE'
+      this.clipsContent = true
+    }
     if (type === 'VECTOR') {
       this.fills = props.fills ?? []
       this.strokes = props.strokes ?? []
@@ -33,8 +38,10 @@ export class MockNode {
       this.fills = props.fills ?? [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }]
       let font = { family: 'Arial', style: 'Regular' }
       let auto = 'NONE'
-      const measure = () => { this.width = Math.ceil(this.characters.length * perChar(font)) }
+      let size = props.fontSize ?? 12
+      const measure = () => { this.width = textWidth(this.characters, font, size); this.height = textHeight(this.characters, size) }
       Object.defineProperty(this, 'fontName', { enumerable: true, get: () => font, set: (f) => { font = f; if (auto === 'WIDTH_AND_HEIGHT') measure() } })
+      Object.defineProperty(this, 'fontSize', { enumerable: true, get: () => size, set: (v) => { size = v; if (auto === 'WIDTH_AND_HEIGHT') measure() } })
       Object.defineProperty(this, 'textAutoResize', { enumerable: true, get: () => auto, set: (v) => { auto = v; if (v === 'WIDTH_AND_HEIGHT') measure() } })
     }
   }
@@ -42,6 +49,8 @@ export class MockNode {
   insertChild(i, c) { if (c.parent) c.parent.children.splice(c.parent.children.indexOf(c), 1); this.children.splice(i, 0, c); c.parent = this }
   remove() { if (this.parent) this.parent.children.splice(this.parent.children.indexOf(this), 1); this.parent = null; this.removed = true }
   resize(w, h) { this.width = w; this.height = h }
+  setPluginData(k, v) { (this.pluginData ??= {})[k] = v }
+  getPluginData(k) { return this.pluginData?.[k] ?? '' }
 }
 
 const SKIP = new Set(['_env', 'parent', 'children', 'id'])

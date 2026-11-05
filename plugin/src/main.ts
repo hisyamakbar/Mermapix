@@ -25,13 +25,16 @@ figma.ui.onmessage = async (msg: {
     try {
       // Preload standard fonts asynchronously so text metrics and property operations never fail
       try {
-        await Promise.all([
-          figma.loadFontAsync({ family: 'Inter', style: 'Regular' }),
-          figma.loadFontAsync({ family: 'Inter', style: 'Medium' }),
-          figma.loadFontAsync({ family: 'Inter', style: 'Bold' }),
-          figma.loadFontAsync({ family: 'Arial', style: 'Regular' }),
-          figma.loadFontAsync({ family: 'Arial', style: 'Bold' }),
-        ])
+        const fonts = [
+          { family: 'Inter', style: 'Regular' },
+          { family: 'Inter', style: 'Medium' },
+          { family: 'Inter', style: 'Semi Bold' },
+          { family: 'Inter', style: 'Bold' },
+          { family: 'Arial', style: 'Regular' },
+          { family: 'Arial', style: 'Bold' },
+        ]
+        // One missing style must not block the others.
+        await Promise.all(fonts.map((f) => figma.loadFontAsync(f).catch(() => {})))
       } catch (fontErr) {
         // Non-blocking fallback if custom style unavailable
       }

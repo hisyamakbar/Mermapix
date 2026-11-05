@@ -584,15 +584,15 @@
 		walk(entity);
 		return out;
 	}
-	var hasFill = (v) => Array.isArray(v.fills) && v.fills.length > 0 && v.fills[0].visible !== false;
-	var hasStroke = (v) => Array.isArray(v.strokes) && v.strokes.length > 0 && v.strokes[0].visible !== false;
+	var hasFill$1 = (v) => Array.isArray(v.fills) && v.fills.length > 0 && v.fills[0].visible !== false;
+	var hasStroke$1 = (v) => Array.isArray(v.strokes) && v.strokes.length > 0 && v.strokes[0].visible !== false;
 	var solid = (color) => [{
 		type: "SOLID",
 		color
 	}];
 	function extractErdPaints(vectors, rowCount, themeVariables) {
-		const fillVectors = vectors.filter(hasFill);
-		const strokeOnly = vectors.filter((v) => hasStroke(v) && !hasFill(v));
+		const fillVectors = vectors.filter(hasFill$1);
+		const strokeOnly = vectors.filter((v) => hasStroke$1(v) && !hasFill$1(v));
 		let isDark = false;
 		for (const v of fillVectors) {
 			const c = v.fills[0].color;
@@ -649,7 +649,7 @@
 				rowsSvg.push(false);
 			}
 		}
-		const borderVector = strokeOnly[0] || vectors.find(hasStroke);
+		const borderVector = strokeOnly[0] || vectors.find(hasStroke$1);
 		const borderSvg = Boolean(borderVector);
 		return {
 			headerFill,
@@ -1088,6 +1088,819 @@
 		}
 	}
 	//#endregion
+	//#region plugin/src/shapeGeometry.ts
+	var ARG_COUNT = {
+		M: 2,
+		L: 2,
+		H: 1,
+		V: 1,
+		C: 6,
+		Q: 4,
+		Z: 0
+	};
+	/** Parses absolute SVG path data. Returns null for anything outside M L H V C Q Z. */
+	function parsePathData(d) {
+		if (typeof d !== "string") return null;
+		const toks = d.match(/[A-Za-z]|-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g);
+		if (!toks || toks.length === 0) return null;
+		const out = [];
+		let i = 0;
+		while (i < toks.length) {
+			const t = toks[i];
+			if (!/^[A-Za-z]$/.test(t)) return null;
+			const cmd = t;
+			const n = ARG_COUNT[cmd];
+			if (n === void 0) return null;
+			i++;
+			if (n === 0) {
+				out.push({
+					c: cmd,
+					p: []
+				});
+				continue;
+			}
+			let first = true;
+			let any = false;
+			while (i < toks.length && !/^[A-Za-z]$/.test(toks[i])) {
+				if (i + n > toks.length) return null;
+				const p = toks.slice(i, i + n).map(Number);
+				if (p.some((v) => !Number.isFinite(v))) return null;
+				out.push({
+					c: !first && cmd === "M" ? "L" : cmd,
+					p
+				});
+				first = false;
+				any = true;
+				i += n;
+			}
+			if (!any) return null;
+		}
+		return out;
+	}
+	/** Samples a path into polylines (straight edges every <= 2px, curves adaptively). */
+	function flattenPath(cmds) {
+		const subpaths = [];
+		let cur = null;
+		let x = 0;
+		let y = 0;
+		let sx = 0;
+		let sy = 0;
+		let curveCount = 0;
+		let lineCount = 0;
+		const lineTo = (nx, ny) => {
+			if (!cur) {
+				cur = [{
+					x,
+					y
+				}];
+				subpaths.push(cur);
+			}
+			const len = Math.hypot(nx - x, ny - y);
+			const steps = Math.min(400, Math.max(1, Math.ceil(len / 2)));
+			for (let s = 1; s <= steps; s++) cur.push({
+				x: x + (nx - x) * s / steps,
+				y: y + (ny - y) * s / steps
+			});
+			x = nx;
+			y = ny;
+		};
+		for (const { c, p } of cmds) if (c === "M") {
+			x = sx = p[0];
+			y = sy = p[1];
+			cur = [{
+				x,
+				y
+			}];
+			subpaths.push(cur);
+		} else if (c === "L") {
+			lineCount++;
+			lineTo(p[0], p[1]);
+		} else if (c === "H") {
+			lineCount++;
+			lineTo(p[0], y);
+		} else if (c === "V") {
+			lineCount++;
+			lineTo(x, p[0]);
+		} else if (c === "C" || c === "Q") {
+			curveCount++;
+			if (!cur) {
+				cur = [{
+					x,
+					y
+				}];
+				subpaths.push(cur);
+			}
+			const chord = Math.hypot((c === "C" ? p[4] : p[2]) - x, (c === "C" ? p[5] : p[3]) - y);
+			const steps = Math.min(64, Math.max(8, Math.ceil(chord / 3)));
+			for (let s = 1; s <= steps; s++) {
+				const t = s / steps;
+				const u = 1 - t;
+				if (c === "C") cur.push({
+					x: u * u * u * x + 3 * u * u * t * p[0] + 3 * u * t * t * p[2] + t * t * t * p[4],
+					y: u * u * u * y + 3 * u * u * t * p[1] + 3 * u * t * t * p[3] + t * t * t * p[5]
+				});
+				else cur.push({
+					x: u * u * x + 2 * u * t * p[0] + t * t * p[2],
+					y: u * u * y + 2 * u * t * p[1] + t * t * p[3]
+				});
+			}
+			x = c === "C" ? p[4] : p[2];
+			y = c === "C" ? p[5] : p[3];
+		} else if (c === "Z") {
+			if (cur && (x !== sx || y !== sy)) lineTo(sx, sy);
+			x = sx;
+			y = sy;
+			cur = null;
+		}
+		return {
+			subpaths,
+			curveCount,
+			lineCount
+		};
+	}
+	function polylineLength(pts) {
+		let len = 0;
+		for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+		return len;
+	}
+	/** Max distance of the sampled points from the outline of a w x h rounded rectangle of radius r. */
+	function roundedRectDeviation(pts, w, h, r) {
+		const hx = w / 2;
+		const hy = h / 2;
+		let max = 0;
+		for (const p of pts) {
+			const qx = Math.abs(p.x - hx) - (hx - r);
+			const qy = Math.abs(p.y - hy) - (hy - r);
+			const d = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
+			const a = Math.abs(d);
+			if (a > max) max = a;
+		}
+		return max;
+	}
+	var idealPerimeter = (w, h, r) => 2 * (w - 2 * r) + 2 * (h - 2 * r) + 2 * Math.PI * r;
+	var RR_TOLERANCE = .8;
+	/**
+	* Fits a single closed outline to a rounded rectangle of the given bounds.
+	* Returns the best radius, or null when the outline is not a (rounded) rectangle.
+	*/
+	function fitRoundedRect(pts, w, h) {
+		if (pts.length < 4 || w < 1 || h < 1) return null;
+		const rMax = Math.min(w, h) / 2;
+		const len = polylineLength(pts);
+		const dev = (r) => roundedRectDeviation(pts, w, h, r);
+		let bestR = 0;
+		let bestD = Infinity;
+		for (let r = 0; r <= rMax + 1e-9; r += .5) {
+			const d = dev(Math.min(r, rMax));
+			if (d < bestD) {
+				bestD = d;
+				bestR = Math.min(r, rMax);
+			}
+		}
+		const dEnd = dev(rMax);
+		if (dEnd <= bestD) {
+			bestD = dEnd;
+			bestR = rMax;
+		}
+		const lo = Math.max(0, bestR - .5);
+		const hi = Math.min(rMax, bestR + .5);
+		for (let r = lo; r <= hi + 1e-9; r += .05) {
+			const d = dev(Math.min(r, rMax));
+			if (d < bestD) {
+				bestD = d;
+				bestR = Math.min(r, rMax);
+			}
+		}
+		if (bestD > RR_TOLERANCE) return null;
+		const ideal = idealPerimeter(w, h, bestR);
+		if (Math.abs(len - ideal) > Math.max(2.5, ideal * .03)) return null;
+		return bestR;
+	}
+	var near = (a, b, tol) => Math.abs(a - b) <= tol;
+	/** Corner points of a polyline-only path (M/L/H/V/Z), consecutive duplicates and closing point removed. */
+	function polygonVertices(cmds) {
+		const polys = [];
+		let cur = null;
+		let x = 0;
+		let y = 0;
+		const push = (nx, ny) => {
+			x = nx;
+			y = ny;
+			if (!cur) {
+				cur = [];
+				polys.push(cur);
+			}
+			const last = cur[cur.length - 1];
+			if (!last || !near(last.x, nx, .01) || !near(last.y, ny, .01)) cur.push({
+				x: nx,
+				y: ny
+			});
+		};
+		for (const { c, p } of cmds) if (c === "M") {
+			cur = null;
+			push(p[0], p[1]);
+		} else if (c === "L") push(p[0], p[1]);
+		else if (c === "H") push(p[0], y);
+		else if (c === "V") push(x, p[0]);
+		for (const poly of polys) if (poly.length > 1) {
+			const a = poly[0];
+			const b = poly[poly.length - 1];
+			if (near(a.x, b.x, .01) && near(a.y, b.y, .01)) poly.pop();
+		}
+		return polys;
+	}
+	/** Douglas-Peucker simplification of a closed outline (splits at the two farthest-apart samples). */
+	function simplifyClosed(pts, eps) {
+		if (pts.length < 4) return pts;
+		const open = pts.slice();
+		const first = open[0];
+		const last = open[open.length - 1];
+		if (near(first.x, last.x, .01) && near(first.y, last.y, .01)) open.pop();
+		let far = 0;
+		let best = -1;
+		open.forEach((p, i) => {
+			const d = Math.hypot(p.x - open[0].x, p.y - open[0].y);
+			if (d > best) {
+				best = d;
+				far = i;
+			}
+		});
+		const dp = (seg) => {
+			if (seg.length < 3) return seg;
+			const a = seg[0];
+			const b = seg[seg.length - 1];
+			const len = Math.hypot(b.x - a.x, b.y - a.y) || 1e-9;
+			let idx = -1;
+			let max = 0;
+			for (let i = 1; i < seg.length - 1; i++) {
+				const d = Math.abs((b.x - a.x) * (a.y - seg[i].y) - (a.x - seg[i].x) * (b.y - a.y)) / len;
+				if (d > max) {
+					max = d;
+					idx = i;
+				}
+			}
+			if (max <= eps) return [a, b];
+			return dp(seg.slice(0, idx + 1)).slice(0, -1).concat(dp(seg.slice(idx)));
+		};
+		const left = dp(open.slice(0, far + 1));
+		const right = dp(open.slice(far).concat([open[0]]));
+		return left.slice(0, -1).concat(right.slice(0, -1));
+	}
+	/** True when the outline follows an axis-aligned ellipse inscribed in the w x h bounds. */
+	function isEllipseOutline(pts, w, h) {
+		const a = w / 2;
+		const b = h / 2;
+		if (a < 1 || b < 1) return false;
+		return pts.every((p) => Math.abs(Math.hypot((p.x - a) / a, (p.y - b) / b) - 1) <= .04);
+	}
+	function classifyPolygon(poly, w, h) {
+		const tol = Math.max(1, Math.min(w, h) * .02);
+		const n = poly.length;
+		if (n === 4) {
+			if ([
+				{
+					x: w / 2,
+					y: 0
+				},
+				{
+					x: w,
+					y: h / 2
+				},
+				{
+					x: w / 2,
+					y: h
+				},
+				{
+					x: 0,
+					y: h / 2
+				}
+			].every((m) => poly.some((p) => near(p.x, m.x, tol) && near(p.y, m.y, tol)))) return "Diamond";
+			if ([...new Set(poly.map((p) => Math.round(p.y / tol)))].length === 2) {
+				const top = poly.filter((p) => near(p.y, 0, tol)).map((p) => p.x).sort((a, b) => a - b);
+				const bottom = poly.filter((p) => near(p.y, h, tol)).map((p) => p.x).sort((a, b) => a - b);
+				if (top.length === 2 && bottom.length === 2) {
+					const topW = top[1] - top[0];
+					const botW = bottom[1] - bottom[0];
+					if (near(topW, botW, tol) && !near(top[0], bottom[0], tol)) return "Parallelogram";
+					if (!near(topW, botW, tol)) return "Trapezoid";
+				}
+			}
+			return "Polygon";
+		}
+		if (n === 6) return "Hexagon";
+		if (n === 5) return "Flag";
+		return "Polygon";
+	}
+	/**
+	* Classifies a shape from its vector path data and bounds.
+	*  - rect / rounded rect / stadium / circle  -> rectLike (Auto Layout frame with corner radius)
+	*  - everything else                         -> complex (wrapper frame around the vector)
+	*/
+	function classifyShape(data, width, height) {
+		const complex = (kind) => ({
+			kind,
+			rectLike: false,
+			cornerRadius: 0
+		});
+		const cmds = parsePathData(data);
+		if (!cmds || width < 1 || height < 1) return complex("Shape");
+		const flat = flattenPath(cmds);
+		if (flat.subpaths.length === 1) {
+			const r = fitRoundedRect(flat.subpaths[0], width, height);
+			if (r !== null) {
+				const rMax = Math.min(width, height) / 2;
+				if (r <= .3) return {
+					kind: "Rectangle",
+					rectLike: true,
+					cornerRadius: 0
+				};
+				if (r >= rMax - .6) return {
+					kind: near(width, height, .6) ? "Circle" : "Stadium",
+					rectLike: true,
+					cornerRadius: rMax
+				};
+				return {
+					kind: "Rounded Rectangle",
+					rectLike: true,
+					cornerRadius: Math.round(r * 100) / 100
+				};
+			}
+		}
+		if (flat.curveCount === 0) {
+			const polys = polygonVertices(cmds);
+			if (polys.length === 1) {
+				const poly = polys[0];
+				if (poly.every((p, i) => {
+					const q = poly[(i + 1) % poly.length];
+					return near(p.x, q.x, .01) || near(p.y, q.y, .01);
+				}) && poly.length > 4) return complex("Subroutine");
+				return complex(classifyPolygon(poly, width, height));
+			}
+			return complex(polys.length > 1 && polys.every((p) => p.length === 4) ? "Subroutine" : "Shape");
+		}
+		if (flat.lineCount === 0 && flat.subpaths.length === 1) {
+			const outline = flat.subpaths[0];
+			if (isEllipseOutline(outline, width, height)) return complex(near(width, height, .6) ? "Circle" : "Ellipse");
+			const poly = simplifyClosed(outline, Math.max(1.5, Math.min(width, height) * .04));
+			return complex(poly.length <= 8 ? classifyPolygon(poly, width, height) : "Shape");
+		}
+		const verticalOnly = cmds.every((c, i) => {
+			if (c.c !== "L") return true;
+			const prev = cmds[i - 1];
+			if (!prev || prev.p.length < 2) return false;
+			const px = prev.p[prev.p.length - 2];
+			return near(c.p[0], px, .5);
+		});
+		if (flat.lineCount > 0 && verticalOnly) return complex("Cylinder");
+		return complex("Shape");
+	}
+	function sameBounds(a, b, tol = .5) {
+		return near(a.x, b.x, tol) && near(a.y, b.y, tol) && near(a.width, b.width, tol) && near(a.height, b.height, tol);
+	}
+	/** Groups items with identical bounds (stacked fill/outline duplicates), preserving z-order. */
+	function groupStackedBounds(items, tol = .5) {
+		const groups = [];
+		for (const it of items) {
+			const g = groups.find((grp) => sameBounds(grp[0], it, tol));
+			if (g) g.push(it);
+			else groups.push([it]);
+		}
+		return groups;
+	}
+	/** A dash pattern that actually draws gaps (rejects `[]`, `[0,0]` and `[1,0]`). */
+	function isRealDash(pattern) {
+		if (!Array.isArray(pattern) || pattern.length === 0) return false;
+		const seq = pattern.length % 2 === 1 ? pattern.concat(pattern) : pattern;
+		let dash = 0;
+		let gap = 0;
+		seq.forEach((v, i) => {
+			if (i % 2 === 0) dash += v;
+			else gap += v;
+		});
+		return dash > 0 && gap > 0;
+	}
+	/**
+	* Decides which vector of a stacked group supplies the fill and which supplies the stroke.
+	* Fill: first vector with a fill. Stroke: the fill source if it has a stroke, else the first
+	* stroked vector. Dash: the stroke source's dash, otherwise any real dash among stroked vectors,
+	* so a dash pattern or weight is never lost by dropping the duplicate.
+	*/
+	function mergePaints(items) {
+		const fillFrom = items.findIndex((v) => v.hasFill);
+		let strokeFrom = -1;
+		if (fillFrom >= 0 && items[fillFrom].hasStroke) strokeFrom = fillFrom;
+		else strokeFrom = items.findIndex((v) => v.hasStroke);
+		let dash = [];
+		if (strokeFrom >= 0) if (isRealDash(items[strokeFrom].dashPattern)) dash = items[strokeFrom].dashPattern;
+		else {
+			const other = items.find((v) => v.hasStroke && isRealDash(v.dashPattern));
+			if (other) dash = other.dashPattern;
+		}
+		return {
+			fillFrom,
+			strokeFrom,
+			dash
+		};
+	}
+	/** Inter style for an original font weight (400 Regular, 500 Medium, 600 Semi Bold, 700+ Bold). */
+	function interStyleForWeight(weight) {
+		const w = typeof weight === "number" && Number.isFinite(weight) ? weight : 400;
+		if (w <= 450) return "Regular";
+		if (w <= 550) return "Medium";
+		if (w <= 650) return "Semi Bold";
+		return "Bold";
+	}
+	/**
+	* Auto Layout centers content in the content box, so a vertical offset of the label from the
+	* shape center (e.g. Mermaid's cylinders) is reproduced with asymmetric padding.
+	* Offsets below `threshold` px are ignored (font metric noise).
+	*/
+	function offsetToPadding(delta, threshold = 1.5) {
+		if (!Number.isFinite(delta) || Math.abs(delta) < threshold) return {
+			start: 0,
+			end: 0
+		};
+		return delta > 0 ? {
+			start: Math.round(delta * 2 * 100) / 100,
+			end: 0
+		} : {
+			start: 0,
+			end: Math.round(-delta * 2 * 100) / 100
+		};
+	}
+	//#endregion
+	//#region plugin/src/shapes.ts
+	var isLive = (n) => Boolean(n) && !n.removed;
+	var hasFill = (v) => Array.isArray(v.fills) && v.fills.length > 0 && v.fills[0].visible !== false && v.fills[0].opacity !== 0;
+	var hasStroke = (v) => Array.isArray(v.strokes) && v.strokes.length > 0 && v.strokes[0].visible !== false && v.strokes[0].opacity !== 0 && Number(v.strokeWeight) > 0;
+	/** Origin of the coordinate space children of `parent` live in (GROUPs are transparent). */
+	function childOrigin(parent) {
+		if (!parent) return {
+			x: 0,
+			y: 0
+		};
+		if (parent.type === "GROUP") return childOrigin(parent.parent);
+		if (parent.type === "FRAME" || parent.type === "COMPONENT" || parent.type === "INSTANCE") {
+			const o = childOrigin(parent.parent);
+			return {
+				x: o.x + (parent.x || 0),
+				y: o.y + (parent.y || 0)
+			};
+		}
+		return {
+			x: 0,
+			y: 0
+		};
+	}
+	/** Converts a position relative to `from`'s coordinate space into `to`'s coordinate space. */
+	function rebase(x, y, from, to) {
+		const a = childOrigin(from);
+		const b = childOrigin(to);
+		return {
+			x: x + a.x - b.x,
+			y: y + a.y - b.y
+		};
+	}
+	/** All VECTOR / non-empty TEXT descendants in z-order; anything else (not a GROUP) lands in `others`. */
+	function collectParts(container) {
+		const out = {
+			vectors: [],
+			texts: [],
+			others: []
+		};
+		const visit = (n) => {
+			if (!isLive(n) || !("children" in n)) return;
+			for (const c of [...n.children]) {
+				if (!isLive(c)) continue;
+				if (c.type === "VECTOR") out.vectors.push(c);
+				else if (c.type === "TEXT") {
+					if ((c.characters || "").trim().length > 0) out.texts.push(c);
+				} else if (c.type === "GROUP") visit(c);
+				else out.others.push(c);
+			}
+		};
+		visit(container);
+		return out;
+	}
+	function cloneAll(arr) {
+		try {
+			return JSON.parse(JSON.stringify(arr));
+		} catch (_unused) {
+			return arr;
+		}
+	}
+	function pathDataOf(v) {
+		const p = v && Array.isArray(v.vectorPaths) ? v.vectorPaths[0] : null;
+		return p && typeof p.data === "string" ? p.data : "";
+	}
+	function labelOf(texts) {
+		const s = texts.map((t) => (t.characters || "").trim()).filter(Boolean).join(" ").replace(/\s+/g, " ");
+		return s.length > 60 ? s.slice(0, 57) + "..." : s;
+	}
+	/**
+	* Switches a shape label from the imported Arial to Inter (weight mapped from the original),
+	* keeps size and color, centers it and lets Figma re-measure the box.
+	*/
+	function styleShapeText(t) {
+		const style = interStyleForWeight(typeof t.fontWeight === "number" ? t.fontWeight : t.fontName && /bold/i.test(t.fontName.style || "") ? 700 : 400);
+		try {
+			t.fontName = {
+				family: "Inter",
+				style
+			};
+		} catch (_unused2) {
+			try {
+				t.fontName = {
+					family: "Inter",
+					style: "Regular"
+				};
+			} catch (_unused3) {}
+		}
+		try {
+			t.textAlignHorizontal = "CENTER";
+		} catch (_unused4) {}
+		try {
+			t.textAlignVertical = "CENTER";
+		} catch (_unused5) {}
+		try {
+			t.textAutoResize = "WIDTH_AND_HEIGHT";
+		} catch (_unused6) {}
+		try {
+			t.visible = true;
+		} catch (_unused7) {}
+		const label = (t.characters || "").trim().replace(/\s+/g, " ");
+		t.name = label.length > 28 ? label.slice(0, 28) + "..." : label;
+	}
+	/** Fixed-size, center/center Auto Layout frame without paint (caller sets fills/strokes). */
+	function createCenteredFrame(spec) {
+		const f = figma.createFrame();
+		f.name = spec.name;
+		f.layoutMode = "HORIZONTAL";
+		f.primaryAxisSizingMode = "FIXED";
+		f.counterAxisSizingMode = "FIXED";
+		f.primaryAxisAlignItems = "CENTER";
+		f.counterAxisAlignItems = "CENTER";
+		f.itemSpacing = 0;
+		f.paddingLeft = 0;
+		f.paddingRight = 0;
+		f.paddingTop = spec.paddingTop || 0;
+		f.paddingBottom = spec.paddingBottom || 0;
+		f.resize(spec.width, spec.height);
+		f.x = spec.x;
+		f.y = spec.y;
+		f.fills = [];
+		f.strokes = [];
+		f.clipsContent = false;
+		return f;
+	}
+	function applyStroke(frame, src, dash) {
+		frame.strokes = src.strokes;
+		frame.strokeWeight = src.strokeWeight;
+		frame.strokeAlign = src.strokeAlign || "CENTER";
+		if (isRealDash(dash)) frame.dashPattern = dash;
+	}
+	function tag(frame, key, value) {
+		if (value && typeof frame.setPluginData === "function") try {
+			frame.setPluginData(key, value);
+		} catch (_unused8) {}
+	}
+	/** Replaces `vector` + `text` (pill / badge style) by one Auto Layout frame carrying the vector's paint. */
+	function convertVectorWithLabel(vector, text, name, cls, extraTag) {
+		const parent = vector.parent;
+		const index = parent.children.indexOf(vector);
+		const w = vector.width;
+		const h = vector.height;
+		const frame = createCenteredFrame({
+			name,
+			x: 0,
+			y: 0,
+			width: w,
+			height: h
+		});
+		parent.insertChild(index, frame);
+		frame.x = vector.x;
+		frame.y = vector.y;
+		frame.fills = hasFill(vector) ? vector.fills : [];
+		if (hasStroke(vector)) applyStroke(frame, vector, vector.dashPattern);
+		frame.cornerRadius = cls.cornerRadius;
+		styleShapeText(text);
+		frame.appendChild(text);
+		vector.remove();
+		tag(frame, "mermapix:kind", extraTag);
+		return frame;
+	}
+	/**
+	* Converts one Mermaid node group (shape vector(s) + label text) into a native frame.
+	* Returns null (group untouched) when it has no vector, or contains unknown node types.
+	*/
+	function convertShapeGroup(group, opts = {}) {
+		if (!isLive(group) || !group.parent || !("children" in group)) return null;
+		const parts = collectParts(group);
+		if (parts.vectors.length === 0 || parts.others.length > 0) return null;
+		const visuals = groupStackedBounds(parts.vectors).map((vs) => ({
+			vectors: vs,
+			x: vs[0].x,
+			y: vs[0].y,
+			width: vs[0].width,
+			height: vs[0].height
+		}));
+		const area = (v) => v.width * v.height;
+		const primary = visuals.reduce((a, b) => area(b) > area(a) ? b : a);
+		const merged = visuals.map((v) => {
+			return {
+				visual: v,
+				merge: mergePaints(v.vectors.map((vec) => ({
+					hasFill: hasFill(vec),
+					hasStroke: hasStroke(vec),
+					strokeWeight: Number(vec.strokeWeight) || 0,
+					dashPattern: Array.isArray(vec.dashPattern) ? vec.dashPattern : []
+				})))
+			};
+		});
+		const primaryMerge = merged.find((m) => m.visual === primary);
+		const pathSource = primary.vectors[Math.max(0, primaryMerge.merge.fillFrom)];
+		let cls = classifyShape(pathDataOf(pathSource), primary.width, primary.height);
+		if (visuals.length > 1) cls = {
+			kind: visuals.every((v) => classifyShape(pathDataOf(v.vectors[0]), v.width, v.height).kind === "Circle") ? "Double Circle" : cls.kind,
+			rectLike: false,
+			cornerRadius: 0
+		};
+		const label = labelOf(parts.texts);
+		const parentNode = group.parent;
+		const index = parentNode.children.indexOf(group);
+		const bx = Math.min(...visuals.map((v) => v.x));
+		const by = Math.min(...visuals.map((v) => v.y));
+		const bw = Math.max(...visuals.map((v) => v.x + v.width)) - bx;
+		const bh = Math.max(...visuals.map((v) => v.y + v.height)) - by;
+		const single = parts.texts.length === 1 ? parts.texts[0] : null;
+		let padTop = 0;
+		let padBottom = 0;
+		if (single) {
+			const pad = offsetToPadding(single.y + single.height / 2 - (by + bh / 2));
+			padTop = Math.min(pad.start, bh);
+			padBottom = Math.min(pad.end, bh);
+		}
+		const groupOrigin = group.parent;
+		const frame = createCenteredFrame({
+			name: label || "Shape",
+			x: 0,
+			y: 0,
+			width: bw,
+			height: bh,
+			paddingTop: padTop,
+			paddingBottom: padBottom
+		});
+		parentNode.insertChild(index, frame);
+		const pos = rebase(bx, by, groupOrigin, parentNode);
+		frame.x = pos.x;
+		frame.y = pos.y;
+		const kept = [];
+		for (const { visual, merge } of merged) {
+			const fillSrc = merge.fillFrom >= 0 ? visual.vectors[merge.fillFrom] : null;
+			const strokeSrc = merge.strokeFrom >= 0 ? visual.vectors[merge.strokeFrom] : null;
+			const base = fillSrc || strokeSrc || visual.vectors[0];
+			if (cls.rectLike && visual === primary) {
+				frame.fills = fillSrc ? cloneAll(fillSrc.fills) : [];
+				if (strokeSrc) applyStroke(frame, strokeSrc, merge.dash);
+				frame.cornerRadius = cls.cornerRadius;
+			} else {
+				base.fills = fillSrc ? cloneAll(fillSrc.fills) : [];
+				if (strokeSrc) {
+					base.strokes = cloneAll(strokeSrc.strokes);
+					base.strokeWeight = strokeSrc.strokeWeight;
+					base.strokeAlign = strokeSrc.strokeAlign || "CENTER";
+					if (isRealDash(merge.dash)) base.dashPattern = merge.dash;
+				} else base.strokes = [];
+				kept.push({
+					vec: base,
+					visual
+				});
+			}
+		}
+		for (const { vec, visual } of kept) {
+			frame.appendChild(vec);
+			try {
+				vec.layoutPositioning = "ABSOLUTE";
+			} catch (_unused9) {}
+			vec.x = visual.x - bx;
+			vec.y = visual.y - by;
+			try {
+				vec.constraints = {
+					horizontal: "SCALE",
+					vertical: "SCALE"
+				};
+			} catch (_unused10) {}
+			vec.name = cls.kind;
+		}
+		let textWidth = 0;
+		for (const t of parts.texts) if (single) {
+			styleShapeText(t);
+			frame.appendChild(t);
+			textWidth = t.width;
+		} else {
+			const rel = rebase(t.x, t.y, groupOrigin, frame);
+			const rx = rel.x;
+			const ry = rel.y;
+			frame.appendChild(t);
+			try {
+				t.layoutPositioning = "ABSOLUTE";
+			} catch (_unused11) {}
+			t.x = rx;
+			t.y = ry;
+			textWidth = Math.max(textWidth, t.width);
+		}
+		for (const v of parts.vectors) if (isLive(v) && v.parent !== frame) try {
+			v.remove();
+		} catch (_unused12) {}
+		try {
+			group.remove();
+		} catch (_unused13) {}
+		tag(frame, "mermapix:kind", cls.kind);
+		tag(frame, "mermapix:node", opts.nodeId);
+		return {
+			frame,
+			kind: cls.kind,
+			rectLike: cls.rectLike,
+			label,
+			textOverflow: textWidth > bw + .5,
+			textWidth,
+			frameWidth: bw
+		};
+	}
+	//#endregion
+	//#region plugin/src/flowchart.ts
+	var FLOWCHART_NODE_RE = /-flowchart-(.+)-(\d+)$/;
+	/** Returns the Mermaid node id when `name` is a flowchart node group name, otherwise null. */
+	function flowchartNodeId(name) {
+		if (!name || typeof name !== "string") return null;
+		if (name.includes("inlined-marker") || name.includes("L_")) return null;
+		const m = FLOWCHART_NODE_RE.exec(name);
+		return m ? m[1] : null;
+	}
+	/** Converts every flowchart node group below `rootNode` into a native Auto Layout frame. */
+	function convertFlowchartNodes(rootNode) {
+		const groups = [];
+		const find = (n) => {
+			if (!n || n.removed || !("children" in n)) return;
+			for (const c of [...n.children]) {
+				if (!c || c.removed) continue;
+				if (c.type === "GROUP") {
+					const nodeId = flowchartNodeId(c.name);
+					if (nodeId !== null) {
+						groups.push({
+							group: c,
+							nodeId
+						});
+						continue;
+					}
+					find(c);
+				}
+			}
+		};
+		find(rootNode);
+		const results = [];
+		for (const { group, nodeId } of groups) {
+			const res = convertShapeGroup(group, { nodeId });
+			if (res) results.push(_objectSpread2(_objectSpread2({}, res), {}, { nodeId }));
+		}
+		return results;
+	}
+	//#endregion
+	//#region plugin/src/edgeLabels.ts
+	var SKIP_NAME_RE = /inlined-marker|entity-|flowchart-|L_[A-Za-z0-9]/;
+	var hasVisible = (paints) => Array.isArray(paints) && paints.length > 0 && paints[0].visible !== false && paints[0].opacity !== 0;
+	/** True when `text` is centered on `vector` (tolerant to Arial vs Inter width differences). */
+	function isCenteredLabel(text, vector) {
+		const dx = text.x + text.width / 2 - (vector.x + vector.width / 2);
+		const dy = text.y + text.height / 2 - (vector.y + vector.height / 2);
+		const tolX = Math.max(3, vector.width * .12);
+		const tolY = Math.max(3, vector.height * .2);
+		const fits = text.width <= vector.width + 6 && text.height <= vector.height + 6;
+		return Math.abs(dx) <= tolX && Math.abs(dy) <= tolY && fits;
+	}
+	function convertEdgeLabels(rootNode) {
+		let converted = 0;
+		const visit = (n) => {
+			if (!n || n.removed || !("children" in n)) return;
+			for (const c of [...n.children]) if (c && !c.removed && c.type === "GROUP" && !SKIP_NAME_RE.test(c.name || "")) visit(c);
+			if (n.type !== "GROUP") return;
+			const kids = [...n.children].filter((c) => c && !c.removed);
+			const vectors = kids.filter((c) => c.type === "VECTOR" && c.width >= 1 && c.height >= 1);
+			const texts = kids.filter((c) => c.type === "TEXT" && (c.characters || "").trim().length > 0);
+			if (vectors.length !== 1 || texts.length !== 1) return;
+			const v = vectors[0];
+			const t = texts[0];
+			if (!hasVisible(v.fills) || hasVisible(v.strokes) && Number(v.strokeWeight) > 0) return;
+			if (v.height > 80 || !isCenteredLabel(t, v)) return;
+			const cls = classifyShape(Array.isArray(v.vectorPaths) && v.vectorPaths[0] ? v.vectorPaths[0].data : "", v.width, v.height);
+			if (!cls.rectLike || cls.kind === "Circle") return;
+			convertVectorWithLabel(v, t, `Label: ${labelOf([t])}`, cls, "Edge Label");
+			converted++;
+		};
+		visit(rootNode);
+		return converted;
+	}
+	//#endregion
 	//#region plugin/src/cleanup.ts
 	/** Pass 1: safe purge of empty text nodes, empty groups and zero-size vectors. */
 	function purgeJunkNodes(n) {
@@ -1187,10 +2000,40 @@
 		} catch (_unused9) {}
 	}
 	/** Per-diagram-type steps, executed in order between the initial purge and the generic cleanup. */
-	var DIAGRAM_STEPS = [{
-		name: "erd",
-		run: (rootNode, themeVariables) => convertErdTables(rootNode, themeVariables)
-	}];
+	var DIAGRAM_STEPS = [
+		{
+			name: "erd",
+			run: (rootNode, themeVariables) => convertErdTables(rootNode, themeVariables)
+		},
+		{
+			name: "flowchart",
+			run: (rootNode) => {
+				convertFlowchartNodes(rootNode);
+			}
+		},
+		{
+			name: "edge-labels",
+			run: (rootNode) => {
+				convertEdgeLabels(rootNode);
+			}
+		}
+	];
+	/**
+	* Figma imports the SVG root as a frame whose white fill is not shown (canvas shows through),
+	* while the web preview has the theme background. Paint the theme background so both match.
+	*/
+	function applyRootBackground(rootNode, themeVariables) {
+		const color = parseColorToFigma(themeVariables && themeVariables.background);
+		if (!color || !rootNode || rootNode.type !== "FRAME") return;
+		try {
+			rootNode.fills = [{
+				type: "SOLID",
+				color,
+				opacity: 1,
+				visible: true
+			}];
+		} catch (_unused) {}
+	}
 	function optimizeDiagramNodes(rootNode, themeVariables) {
 		purgeJunkNodes(rootNode);
 		for (const step of DIAGRAM_STEPS) step.run(rootNode, themeVariables);
@@ -1198,6 +2041,7 @@
 		elevateSequenceNumbers(rootNode);
 		unwrapRootGroup(rootNode);
 		finalClean(rootNode);
+		applyRootBackground(rootNode, themeVariables);
 	}
 	//#endregion
 	//#region plugin/src/main.ts
@@ -1210,27 +2054,31 @@
 		if (msg.type === "create-svg" && msg.svg) try {
 			try {
 				await Promise.all([
-					figma.loadFontAsync({
+					{
 						family: "Inter",
 						style: "Regular"
-					}),
-					figma.loadFontAsync({
+					},
+					{
 						family: "Inter",
 						style: "Medium"
-					}),
-					figma.loadFontAsync({
+					},
+					{
+						family: "Inter",
+						style: "Semi Bold"
+					},
+					{
 						family: "Inter",
 						style: "Bold"
-					}),
-					figma.loadFontAsync({
+					},
+					{
 						family: "Arial",
 						style: "Regular"
-					}),
-					figma.loadFontAsync({
+					},
+					{
 						family: "Arial",
 						style: "Bold"
-					})
-				]);
+					}
+				].map((f) => figma.loadFontAsync(f).catch(() => {})));
 			} catch (fontErr) {}
 			const processedSvg = prepareSvgForFigma(msg.svg);
 			const node = figma.createNodeFromSvg(processedSvg);

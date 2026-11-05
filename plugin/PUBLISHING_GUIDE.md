@@ -22,7 +22,7 @@ A comprehensive, step-by-step guide for publishing the **Mermapix: Mermaid to Ed
 Before publishing or testing the latest changes, compile the production plugin bundle:
 
 ```bash
-# Build sandbox backend (code.ts -> code.js) and frontend UI (Vite -> plugin/ui.html)
+# Build sandbox backend (plugin/src/main.ts -> code.js) and frontend UI (Vite -> plugin/ui.html)
 pnpm build:plugin
 ```
 

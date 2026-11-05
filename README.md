@@ -60,7 +60,7 @@ Open `http://localhost:8443` in your browser.
 # Build web production bundle
 pnpm build
 
-# Build Figma Companion Plugin (compiles code.ts -> code.js and inlines UI -> plugin/ui.html)
+# Build Figma Companion Plugin (bundles plugin/src/main.ts -> plugin/code.js and inlines UI -> plugin/ui.html)
 pnpm build:plugin
 
 # Run unit tests (converters, sanitize, table naming)

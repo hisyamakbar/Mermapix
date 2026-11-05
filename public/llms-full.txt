@@ -20,7 +20,7 @@ Mermapix implements a specialized SVG normalization and AST transformation pipel
    - Resolves and inlines CSS variables into static presentation attributes (`fill`, `stroke`, `font-family`, `font-size`, `font-weight`).
    - Normalizes arrowheads and markers (`marker-end="url(#...)"`) to prevent detached or invisible relationship lines in Figma.
    - Wraps clipboard payloads with standard MIME type `image/svg+xml` so pressing `Cmd+V` in Figma automatically pastes native vector objects.
-2. **Companion Figma Plugin (`plugin/code.ts`)**:
+2. **Companion Figma Plugin (`plugin/src/`)**:
    - Inspects imported vector groups and identifies ERD entity cards.
    - Converts entity tables into native Figma vertical **Auto Layout** frames (`layoutMode = "VERTICAL"`).
    - Dissolves redundant nested wrapper groups, elevating layers directly into a clean, searchable hierarchy.

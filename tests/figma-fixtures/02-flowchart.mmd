@@ -1,0 +1,22 @@
+flowchart LR
+  start(["Paste Mermaid code"]) --> parse{"Valid syntax?"}
+  parse -->|no| fix["Show error with line number"]
+  fix --> start
+  parse -->|yes| preview[["Live preview"]]
+
+  subgraph EXPORT["Export"]
+    direction TB
+    copy["Copy to Figma"]
+    svg["Download SVG"]
+    png["Download PNG"]
+  end
+
+  preview --> copy
+  preview --> svg
+  preview --> png
+  copy --> figma[("Editable Figma layers")]
+
+  classDef good fill:#d4f4dd,stroke:#2e7d4f,color:#14321f,stroke-width:2px
+  classDef warn fill:#fdebc8,stroke:#b07d1a,color:#3d2a05,stroke-width:2px
+  class preview,figma good
+  class fix warn

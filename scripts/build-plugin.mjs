@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execSync } from 'node:child_process'
+import { build } from 'vite'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -9,12 +10,32 @@ const rootDir = path.resolve(__dirname, '..')
 
 console.log('🚀 Building Mermapix Figma Plugin...')
 
-// 1. Compile plugin sandbox backend (plugin/code.ts -> plugin/code.js)
-console.log('⚡ Compiling plugin/code.ts...')
-execSync('npx tsc plugin/code.ts --target es2017 --module commonjs --skipLibCheck', {
-  cwd: rootDir,
-  stdio: 'inherit',
+// 1. Bundle plugin sandbox backend (plugin/src/main.ts -> plugin/code.js)
+//    Figma's sandbox needs one classic script: IIFE, no imports/exports, not minified.
+console.log('⚡ Bundling plugin/src/main.ts -> plugin/code.js...')
+const sandboxTmpDir = path.resolve(rootDir, 'dist-plugin-sandbox')
+await build({
+  root: rootDir,
+  configFile: false,
+  logLevel: 'warn',
+  publicDir: false,
+  build: {
+    outDir: sandboxTmpDir,
+    emptyOutDir: true,
+    minify: false,
+    target: 'es2017',
+    reportCompressedSize: false,
+    lib: {
+      entry: path.resolve(rootDir, 'plugin/src/main.ts'),
+      formats: ['iife'],
+      name: 'MermapixPlugin',
+      fileName: () => 'code.js',
+    },
+  },
 })
+fs.copyFileSync(path.join(sandboxTmpDir, 'code.js'), path.resolve(rootDir, 'plugin/code.js'))
+fs.rmSync(sandboxTmpDir, { recursive: true, force: true })
+console.log('✅ Wrote plugin/code.js')
 
 // 2. Run Vite build with vite.plugin.config.ts
 console.log('📦 Building plugin UI...')

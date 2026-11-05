@@ -1,0 +1,12 @@
+erDiagram
+  KNOWLEDGE_BASE ||--o{ ARTICLE : contains
+  KNOWLEDGE_BASE {
+    uuid id PK
+    string name
+  }
+  ARTICLE {
+    bigint id PK
+    uuid knowledge_base_id FK
+    timestamp_with_time_zone published_at "nullable publish time"
+    varchar_255 slug UK
+  }

@@ -1,0 +1,11 @@
+erDiagram
+  TAG ||--o{ POST : labels
+  POST ||--o{ COMMENT : has
+  POST {
+    int id PK
+    string title
+  }
+  COMMENT {
+    int id PK
+    int post_id FK
+  }

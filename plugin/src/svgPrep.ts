@@ -67,7 +67,48 @@ export function nameInlinedMarkers(svg: string): string {
   return out + svg.slice(cursor)
 }
 
+const CLIP_PATH_RE = /<clipPath\b[^>]*>[\s\S]*?<\/clipPath>/g
+const SIMPLE_CLIP_SHAPE_RE = /^\s*<(rect|circle|ellipse|polygon|path)\b[^>]*?(?:\/>|>\s*<\/\1>)\s*$/
+const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * Figma's SVG importer does not turn `<clipPath>` into a mask: an inline clipPath (Mermaid's treemap puts
+ * one in every section and leaf to clip its labels) lands as a VISIBLE shape painted with the fill it
+ * inherits, covering the real shapes and their labels. Drop every clipPath that only clips text (its content
+ * is a single simple shape and every `clip-path="url(#id)"` reference is on a `<text>`/`<tspan>`), together
+ * with those references. Clips on shapes, multi-shape clips and unreferenced-but-complex ones are left alone.
+ */
+export function stripLabelClipPaths(svg: string): string {
+  if (!svg || typeof svg !== 'string' || !svg.includes('<clipPath')) return svg
+  const dropIds = new Set<string>()
+  let m: RegExpExecArray | null
+  const re = new RegExp(CLIP_PATH_RE.source, 'g')
+  while ((m = re.exec(svg)) !== null) {
+    const open = m[0].match(/^<clipPath\b[^>]*>/)
+    const idMatch = open && open[0].match(/\bid=["']([^"']+)["']/)
+    if (!idMatch) continue
+    const id = idMatch[1]
+    const inner = m[0].slice(open![0].length, m[0].length - '</clipPath>'.length)
+    if (!SIMPLE_CLIP_SHAPE_RE.test(inner)) continue
+    const idRe = escapeRe(id)
+    const refTags = svg.match(new RegExp(`<[a-zA-Z][^<>]*?\\sclip-path=["']url\\(#?${idRe}\\)["'][^<>]*>`, 'g')) || []
+    const allRefs = svg.match(new RegExp(`url\\(#?${idRe}\\)`, 'g')) || []
+    const onlyText = refTags.every((tag) => /^<(?:text|tspan)\b/.test(tag))
+    // Every mention of the id must be one of the attributes we are about to remove (e.g. no style="clip-path:...").
+    if (onlyText && refTags.length === allRefs.length) dropIds.add(id)
+  }
+  if (dropIds.size === 0) return svg
+  let out = svg.replace(new RegExp(CLIP_PATH_RE.source, 'g'), (block) => {
+    const idMatch = block.match(/^<clipPath\b[^>]*?\bid=["']([^"']+)["']/)
+    return idMatch && dropIds.has(idMatch[1]) ? '' : block
+  })
+  out = out.replace(/<(?:text|tspan)\b[^<>]*>/g, (tag) =>
+    tag.replace(/\sclip-path=["']url\(#?([^"')]+)\)["']/, (attr, id) => (dropIds.has(id) ? '' : attr)),
+  )
+  return out
+}
+
 /** Full pre-processing pipeline for the SVG received from the UI. */
 export function prepareSvgForFigma(svg: string): string {
-  return nameInlinedMarkers(ensureMarkersInlined(svg))
+  return nameInlinedMarkers(ensureMarkersInlined(stripLabelClipPaths(svg)))
 }

@@ -451,9 +451,44 @@
 		}
 		return out + svg.slice(cursor);
 	}
+	var CLIP_PATH_RE = /<clipPath\b[^>]*>[\s\S]*?<\/clipPath>/g;
+	var SIMPLE_CLIP_SHAPE_RE = /^\s*<(rect|circle|ellipse|polygon|path)\b[^>]*?(?:\/>|>\s*<\/\1>)\s*$/;
+	var escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	/**
+	* Figma's SVG importer does not turn `<clipPath>` into a mask: an inline clipPath (Mermaid's treemap puts
+	* one in every section and leaf to clip its labels) lands as a VISIBLE shape painted with the fill it
+	* inherits, covering the real shapes and their labels. Drop every clipPath that only clips text (its content
+	* is a single simple shape and every `clip-path="url(#id)"` reference is on a `<text>`/`<tspan>`), together
+	* with those references. Clips on shapes, multi-shape clips and unreferenced-but-complex ones are left alone.
+	*/
+	function stripLabelClipPaths(svg) {
+		if (!svg || typeof svg !== "string" || !svg.includes("<clipPath")) return svg;
+		const dropIds = /* @__PURE__ */ new Set();
+		let m;
+		const re = new RegExp(CLIP_PATH_RE.source, "g");
+		while ((m = re.exec(svg)) !== null) {
+			const open = m[0].match(/^<clipPath\b[^>]*>/);
+			const idMatch = open && open[0].match(/\bid=["']([^"']+)["']/);
+			if (!idMatch) continue;
+			const id = idMatch[1];
+			const inner = m[0].slice(open[0].length, m[0].length - 11);
+			if (!SIMPLE_CLIP_SHAPE_RE.test(inner)) continue;
+			const idRe = escapeRe(id);
+			const refTags = svg.match(new RegExp(`<[a-zA-Z][^<>]*?\\sclip-path=["']url\\(#?${idRe}\\)["'][^<>]*>`, "g")) || [];
+			const allRefs = svg.match(new RegExp(`url\\(#?${idRe}\\)`, "g")) || [];
+			if (refTags.every((tag) => /^<(?:text|tspan)\b/.test(tag)) && refTags.length === allRefs.length) dropIds.add(id);
+		}
+		if (dropIds.size === 0) return svg;
+		let out = svg.replace(new RegExp(CLIP_PATH_RE.source, "g"), (block) => {
+			const idMatch = block.match(/^<clipPath\b[^>]*?\bid=["']([^"']+)["']/);
+			return idMatch && dropIds.has(idMatch[1]) ? "" : block;
+		});
+		out = out.replace(/<(?:text|tspan)\b[^<>]*>/g, (tag) => tag.replace(/\sclip-path=["']url\(#?([^"')]+)\)["']/, (attr, id) => dropIds.has(id) ? "" : attr));
+		return out;
+	}
 	/** Full pre-processing pipeline for the SVG received from the UI. */
 	function prepareSvgForFigma(svg) {
-		return nameInlinedMarkers(ensureMarkersInlined(svg));
+		return nameInlinedMarkers(ensureMarkersInlined(stripLabelClipPaths(svg)));
 	}
 	//#endregion
 	//#region plugin/src/theme.ts
@@ -1281,7 +1316,7 @@
 		if (Math.abs(len - ideal) > Math.max(2.5, ideal * .03)) return null;
 		return bestR;
 	}
-	var near = (a, b, tol) => Math.abs(a - b) <= tol;
+	var near$1 = (a, b, tol) => Math.abs(a - b) <= tol;
 	/** Corner points of a polyline-only path (M/L/H/V/Z), consecutive duplicates and closing point removed. */
 	function polygonVertices(cmds) {
 		const polys = [];
@@ -1296,7 +1331,7 @@
 				polys.push(cur);
 			}
 			const last = cur[cur.length - 1];
-			if (!last || !near(last.x, nx, .01) || !near(last.y, ny, .01)) cur.push({
+			if (!last || !near$1(last.x, nx, .01) || !near$1(last.y, ny, .01)) cur.push({
 				x: nx,
 				y: ny
 			});
@@ -1310,7 +1345,7 @@
 		for (const poly of polys) if (poly.length > 1) {
 			const a = poly[0];
 			const b = poly[poly.length - 1];
-			if (near(a.x, b.x, .01) && near(a.y, b.y, .01)) poly.pop();
+			if (near$1(a.x, b.x, .01) && near$1(a.y, b.y, .01)) poly.pop();
 		}
 		return polys;
 	}
@@ -1320,7 +1355,7 @@
 		const open = pts.slice();
 		const first = open[0];
 		const last = open[open.length - 1];
-		if (near(first.x, last.x, .01) && near(first.y, last.y, .01)) open.pop();
+		if (near$1(first.x, last.x, .01) && near$1(first.y, last.y, .01)) open.pop();
 		let far = 0;
 		let best = -1;
 		open.forEach((p, i) => {
@@ -1378,7 +1413,7 @@
 				x: 0,
 				y: h
 			}
-		].every((c) => poly.some((p) => near(p.x, c.x, tol) && near(p.y, c.y, tol)));
+		].every((c) => poly.some((p) => near$1(p.x, c.x, tol) && near$1(p.y, c.y, tol)));
 	}
 	function classifyPolygon(poly, w, h) {
 		const tol = Math.max(1, Math.min(w, h) * .02);
@@ -1401,15 +1436,15 @@
 					x: 0,
 					y: h / 2
 				}
-			].every((m) => poly.some((p) => near(p.x, m.x, tol) && near(p.y, m.y, tol)))) return "Diamond";
+			].every((m) => poly.some((p) => near$1(p.x, m.x, tol) && near$1(p.y, m.y, tol)))) return "Diamond";
 			if ([...new Set(poly.map((p) => Math.round(p.y / tol)))].length === 2) {
-				const top = poly.filter((p) => near(p.y, 0, tol)).map((p) => p.x).sort((a, b) => a - b);
-				const bottom = poly.filter((p) => near(p.y, h, tol)).map((p) => p.x).sort((a, b) => a - b);
+				const top = poly.filter((p) => near$1(p.y, 0, tol)).map((p) => p.x).sort((a, b) => a - b);
+				const bottom = poly.filter((p) => near$1(p.y, h, tol)).map((p) => p.x).sort((a, b) => a - b);
 				if (top.length === 2 && bottom.length === 2) {
 					const topW = top[1] - top[0];
 					const botW = bottom[1] - bottom[0];
-					if (near(topW, botW, tol) && !near(top[0], bottom[0], tol)) return "Parallelogram";
-					if (!near(topW, botW, tol)) return "Trapezoid";
+					if (near$1(topW, botW, tol) && !near$1(top[0], bottom[0], tol)) return "Parallelogram";
+					if (!near$1(topW, botW, tol)) return "Trapezoid";
 				}
 			}
 			return "Polygon";
@@ -1442,7 +1477,7 @@
 					cornerRadius: 0
 				};
 				if (r >= rMax - .6) return {
-					kind: near(width, height, .6) ? "Circle" : "Stadium",
+					kind: near$1(width, height, .6) ? "Circle" : "Stadium",
 					rectLike: true,
 					cornerRadius: rMax
 				};
@@ -1459,7 +1494,7 @@
 				const poly = polys[0];
 				const axisAligned = poly.every((p, i) => {
 					const q = poly[(i + 1) % poly.length];
-					return near(p.x, q.x, .01) || near(p.y, q.y, .01);
+					return near$1(p.x, q.x, .01) || near$1(p.y, q.y, .01);
 				});
 				if (poly.length === 4 && isBoundsCorners(poly, width, height)) return {
 					kind: "Rectangle",
@@ -1473,7 +1508,7 @@
 		}
 		if (flat.lineCount === 0 && flat.subpaths.length === 1) {
 			const outline = flat.subpaths[0];
-			if (isEllipseOutline(outline, width, height)) return complex(near(width, height, .6) ? "Circle" : "Ellipse");
+			if (isEllipseOutline(outline, width, height)) return complex(near$1(width, height, .6) ? "Circle" : "Ellipse");
 			const poly = simplifyClosed(outline, Math.max(1.5, Math.min(width, height) * .04));
 			return complex(poly.length <= 8 ? classifyPolygon(poly, width, height) : "Shape");
 		}
@@ -1482,13 +1517,13 @@
 			const prev = cmds[i - 1];
 			if (!prev || prev.p.length < 2) return false;
 			const px = prev.p[prev.p.length - 2];
-			return near(c.p[0], px, .5);
+			return near$1(c.p[0], px, .5);
 		});
 		if (flat.lineCount > 0 && verticalOnly) return complex("Cylinder");
 		return complex("Shape");
 	}
 	function sameBounds(a, b, tol = .5) {
-		return near(a.x, b.x, tol) && near(a.y, b.y, tol) && near(a.width, b.width, tol) && near(a.height, b.height, tol);
+		return near$1(a.x, b.x, tol) && near$1(a.y, b.y, tol) && near$1(a.width, b.width, tol) && near$1(a.height, b.height, tol);
 	}
 	/** Groups items with identical bounds (stacked fill/outline duplicates), preserving z-order. */
 	function groupStackedBounds(items, tol = .5) {
@@ -1563,7 +1598,7 @@
 	}
 	//#endregion
 	//#region plugin/src/shapes.ts
-	var isLive$6 = (n) => Boolean(n) && !n.removed;
+	var isLive$8 = (n) => Boolean(n) && !n.removed;
 	var hasFill = (v) => Array.isArray(v.fills) && v.fills.length > 0 && v.fills[0].visible !== false && v.fills[0].opacity !== 0;
 	var hasStroke = (v) => Array.isArray(v.strokes) && v.strokes.length > 0 && v.strokes[0].visible !== false && v.strokes[0].opacity !== 0 && Number(v.strokeWeight) > 0;
 	/** Origin of the coordinate space children of `parent` live in (GROUPs are transparent). */
@@ -1602,9 +1637,9 @@
 			others: []
 		};
 		const visit = (n) => {
-			if (!isLive$6(n) || !("children" in n)) return;
+			if (!isLive$8(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$6(c)) continue;
+				if (!isLive$8(c)) continue;
 				if (c.type === "VECTOR") out.vectors.push(c);
 				else if (c.type === "TEXT") {
 					if ((c.characters || "").trim().length > 0) out.texts.push(c);
@@ -1762,7 +1797,7 @@
 		frame.fills = fillSrc ? cloneAll(fillSrc.fills) : [];
 		if (strokeSrc) applyStroke(frame, strokeSrc, merge.dash);
 		frame.cornerRadius = cls.cornerRadius;
-		for (const v of vectors) if (isLive$6(v)) try {
+		for (const v of vectors) if (isLive$8(v)) try {
 			v.remove();
 		} catch (_unused10) {}
 		tag(frame, "mermapix:kind", cls.kind);
@@ -1773,7 +1808,7 @@
 	* Returns null (group untouched) when it has no vector, or contains unknown node types.
 	*/
 	function convertShapeGroup(group, opts = {}) {
-		if (!isLive$6(group) || !group.parent || !("children" in group)) return null;
+		if (!isLive$8(group) || !group.parent || !("children" in group)) return null;
 		const parts = collectParts(group);
 		if (parts.vectors.length === 0 || parts.others.length > 0) return null;
 		const visuals = groupStackedBounds(parts.vectors).map((vs) => ({
@@ -1888,7 +1923,7 @@
 			t.y = ry;
 			textWidth = Math.max(textWidth, t.width);
 		}
-		for (const v of parts.vectors) if (isLive$6(v) && v.parent !== frame) try {
+		for (const v of parts.vectors) if (isLive$8(v) && v.parent !== frame) try {
 			v.remove();
 		} catch (_unused14) {}
 		try {
@@ -2116,7 +2151,7 @@
 	var CLUSTER_ID_KEY = "mermapix:cluster";
 	var CLUSTER_LABEL_KEY = "mermapix:label";
 	var NODE_ID_KEY = "mermapix:node";
-	var isLive$5 = (n) => Boolean(n) && !n.removed;
+	var isLive$7 = (n) => Boolean(n) && !n.removed;
 	var readData$2 = (n, key) => {
 		try {
 			return typeof n.getPluginData === "function" ? n.getPluginData(key) || "" : "";
@@ -2140,9 +2175,9 @@
 	function findClusterGroups(root) {
 		const out = [];
 		const visit = (n) => {
-			if (!isLive$5(n) || !("children" in n)) return;
+			if (!isLive$7(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$5(c) || c.type !== "GROUP") continue;
+				if (!isLive$7(c) || c.type !== "GROUP") continue;
 				const id = clusterIdFromName(c.name);
 				if (id !== null) {
 					const parts = collectParts(c);
@@ -2224,9 +2259,9 @@
 	function collectItems(root) {
 		const items = [];
 		const visit = (n) => {
-			if (!isLive$5(n) || !("children" in n)) return;
+			if (!isLive$7(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$5(c)) continue;
+				if (!isLive$7(c)) continue;
 				if (isClusterFrame(c) || isNodeFrame(c)) items.push({
 					node: c,
 					rect: absRect(c),
@@ -2287,7 +2322,7 @@
 	}
 	//#endregion
 	//#region plugin/src/connectors.ts
-	var isLive$4 = (n) => Boolean(n) && !n.removed;
+	var isLive$6 = (n) => Boolean(n) && !n.removed;
 	var readData$1 = (n, key) => {
 		try {
 			return typeof n.getPluginData === "function" ? n.getPluginData(key) || "" : "";
@@ -2300,11 +2335,11 @@
 	function collectEdges(root) {
 		const edges = [];
 		const visit = (n) => {
-			if (!isLive$4(n) || !("children" in n)) return;
+			if (!isLive$6(n) || !("children" in n)) return;
 			const kids = [...n.children];
 			for (let i = 0; i < kids.length; i++) {
 				const c = kids[i];
-				if (!isLive$4(c)) continue;
+				if (!isLive$6(c)) continue;
 				if (c.type === "VECTOR") {
 					var _edgeBodyFromName;
 					const body = (_edgeBodyFromName = edgeBodyFromName(c.name)) !== null && _edgeBodyFromName !== void 0 ? _edgeBodyFromName : isAnonymousEdgeName(c.name) ? "" : null;
@@ -2312,7 +2347,7 @@
 					const markers = [];
 					for (let j = i + 1; j < kids.length; j++) {
 						const m = kids[j];
-						if (isLive$4(m) && m.type === "GROUP" && String(m.name || "").includes("inlined-marker")) markers.push(m);
+						if (isLive$6(m) && m.type === "GROUP" && String(m.name || "").includes("inlined-marker")) markers.push(m);
 						else break;
 					}
 					const a = absRect(c);
@@ -2336,9 +2371,9 @@
 		const labels = /* @__PURE__ */ new Map();
 		const targets = [];
 		const visit = (n) => {
-			if (!isLive$4(n) || !("children" in n)) return;
+			if (!isLive$6(n) || !("children" in n)) return;
 			for (const c of n.children) {
-				if (!isLive$4(c)) continue;
+				if (!isLive$6(c)) continue;
 				if (isNodeFrame(c)) {
 					const id = readData$1(c, NODE_ID_KEY);
 					const label = readData$1(c, CLUSTER_LABEL_KEY);
@@ -2367,9 +2402,9 @@
 	function collectEdgeLabelFrames(root) {
 		const out = [];
 		const visit = (n) => {
-			if (!isLive$4(n) || !("children" in n)) return;
+			if (!isLive$6(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$4(c)) continue;
+				if (!isLive$6(c)) continue;
 				if (isEdgeLabelFrame(c)) out.push(c);
 				else if (c.type === "GROUP" && !String(c.name || "").includes("inlined-marker")) visit(c);
 			}
@@ -2382,9 +2417,9 @@
 		const clusters = [];
 		const nodes = [];
 		const visit = (n) => {
-			if (!isLive$4(n) || !("children" in n)) return;
+			if (!isLive$6(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$4(c)) continue;
+				if (!isLive$6(c)) continue;
 				if (isClusterFrame(c)) clusters.push(c);
 				else if (isNodeFrame(c)) nodes.push(c);
 				else if (c.type === "GROUP") visit(c);
@@ -2397,7 +2432,7 @@
 		};
 	}
 	function makeGroup$1(members, parent, name) {
-		const live = members.filter(isLive$4);
+		const live = members.filter(isLive$6);
 		if (live.length === 0) return null;
 		try {
 			const g = figma.group(live, parent);
@@ -2418,7 +2453,7 @@
 			labelsInEdges: 0,
 			labelsLoose: 0
 		};
-		if (!isLive$4(root) || root.type !== "FRAME") return result;
+		if (!isLive$6(root) || root.type !== "FRAME") return result;
 		const { labels: labelMap, targets } = collectLabels(root);
 		const edges = collectEdges(root);
 		const labelFrames = collectEdgeLabelFrames(root);
@@ -2658,14 +2693,14 @@
 	}
 	//#endregion
 	//#region plugin/src/sequence.ts
-	var isLive$3 = (n) => Boolean(n) && !n.removed;
+	var isLive$5 = (n) => Boolean(n) && !n.removed;
 	var isMarkerGroup = (n) => n.type === "GROUP" && String(n.name || "").includes("inlined-marker");
 	var clip = (s, max) => s.length > max ? s.slice(0, max - 1) + "…" : s;
 	var SEQ_KIND_KEY = "mermapix:kind";
 	var isStrokeLine = (v) => hasStroke(v) && !hasFill(v) && (v.width < .01 || v.height < .01) && (v.width > .01 || v.height > .01);
 	function hasMarkerDescendant(g) {
 		for (const c of g.children || []) {
-			if (!isLive$3(c)) continue;
+			if (!isLive$5(c)) continue;
 			if (isMarkerGroup(c)) return true;
 			if (c.type === "GROUP" && hasMarkerDescendant(c)) return true;
 		}
@@ -2703,7 +2738,7 @@
 	/** All pieces below `parent` in z-order; recognized groups are taken whole, other groups are entered. */
 	function walk(parent, out) {
 		for (const c of [...parent.children || []]) {
-			if (!isLive$3(c)) continue;
+			if (!isLive$5(c)) continue;
 			if (c.type === "GROUP") {
 				if (isMarkerGroup(c)) {
 					out.push({
@@ -2743,7 +2778,7 @@
 		t.y = cy - t.height / 2 - o.y;
 	}
 	function removeIfEmptyGroup(g) {
-		if (isLive$3(g) && g.type === "GROUP" && Array.isArray(g.children) && g.children.length === 0) try {
+		if (isLive$5(g) && g.type === "GROUP" && Array.isArray(g.children) && g.children.length === 0) try {
 			g.remove();
 		} catch (_unused) {}
 	}
@@ -2771,7 +2806,7 @@
 		return f;
 	}
 	function makeGroup(members, parent, name) {
-		const live = members.filter(isLive$3);
+		const live = members.filter(isLive$5);
 		if (live.length === 0) return null;
 		try {
 			const g = figma.group(live, parent);
@@ -3013,7 +3048,7 @@
 			highlights: 0,
 			messages: 0
 		};
-		if (!isLive$3(root) || root.type !== "FRAME" || !Array.isArray(root.children)) return result;
+		if (!isLive$5(root) || root.type !== "FRAME" || !Array.isArray(root.children)) return result;
 		const entries = [];
 		walk(root, entries);
 		const lifelines = entries.filter((e) => e.kind === "leaf" && e.node.type === "VECTOR" && isLifelineName(e.node.name) && e.node.width < .01 && e.node.height > 1).map((e) => ({
@@ -3107,7 +3142,7 @@
 			const i = nearestIndex(x, participantNames.map((p) => p.cx), tol);
 			return i >= 0 ? participantNames[i].name : "";
 		};
-		const looseTexts = entries.filter((e) => e.kind === "leaf" && e.node.type === "TEXT" && isLive$3(e.node)).map((e) => ({
+		const looseTexts = entries.filter((e) => e.kind === "leaf" && e.node.type === "TEXT" && isLive$5(e.node)).map((e) => ({
 			node: e.node,
 			r: absRect(e.node)
 		}));
@@ -3162,7 +3197,7 @@
 			blocks.push(b);
 			result.blocks++;
 		}
-		const raw = parseMessages(entries.filter((e) => e.kind === "leaf" && !consumed.has(e.node) && isLive$3(e.node)).map((e) => e.node));
+		const raw = parseMessages(entries.filter((e) => e.kind === "leaf" && !consumed.has(e.node) && isLive$5(e.node)).map((e) => e.node));
 		const messages = [];
 		const xs = lifelines.map((l) => l.cx);
 		raw.forEach((m, i) => {
@@ -3301,10 +3336,10 @@
 				items: topMessages
 			}
 		];
-		const leftovers = [...root.children].filter((c) => isLive$3(c));
+		const leftovers = [...root.children].filter((c) => isLive$5(c));
 		for (const s of strata) for (const it of s.items) placed.add(it.node);
 		for (const s of strata) {
-			const nodes = s.items.map((it) => it.node).filter(isLive$3);
+			const nodes = s.items.map((it) => it.node).filter(isLive$5);
 			if (nodes.length === 0) continue;
 			for (const n of nodes) if (n.parent !== root) moveKeepingAbs(n, root, absRect(n));
 			else root.appendChild(n);
@@ -3314,7 +3349,7 @@
 			}
 		}
 		for (const c of leftovers) {
-			if (!isLive$3(c) || placed.has(c)) continue;
+			if (!isLive$5(c) || placed.has(c)) continue;
 			if (c.type === "GROUP" && Array.isArray(c.children) && c.children.length === 0) {
 				try {
 					c.remove();
@@ -3430,13 +3465,13 @@
 	}
 	//#endregion
 	//#region plugin/src/class.ts
-	var isLive$2 = (n) => Boolean(n) && !n.removed;
+	var isLive$4 = (n) => Boolean(n) && !n.removed;
 	function findGroups(root, idOf) {
 		const out = [];
 		const visit = (n) => {
-			if (!isLive$2(n) || !("children" in n)) return;
+			if (!isLive$4(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$2(c) || c.type !== "GROUP") continue;
+				if (!isLive$4(c) || c.type !== "GROUP") continue;
 				const id = idOf(c.name);
 				if (id !== null) out.push({
 					group: c,
@@ -3500,7 +3535,7 @@
 	}
 	/** Converts one class group; returns null (group untouched) when its structure is not the expected one. */
 	function convertClassGroup(group, id) {
-		if (!isLive$2(group) || !group.parent) return null;
+		if (!isLive$4(group) || !group.parent) return null;
 		const parts = collectParts(group);
 		if (parts.vectors.length === 0 || parts.others.length > 0) return null;
 		const found = analyze(parts.vectors);
@@ -3694,13 +3729,13 @@
 	}
 	//#endregion
 	//#region plugin/src/state.ts
-	var isLive$1 = (n) => Boolean(n) && !n.removed;
+	var isLive$3 = (n) => Boolean(n) && !n.removed;
 	function findStateGroups(root) {
 		const out = [];
 		const visit = (n) => {
-			if (!isLive$1(n) || !("children" in n)) return;
+			if (!isLive$3(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$1(c) || c.type !== "GROUP") continue;
+				if (!isLive$3(c) || c.type !== "GROUP") continue;
 				const info = stateInfoFromName(c.name);
 				if (info) out.push({
 					group: c,
@@ -3848,11 +3883,490 @@
 			notes: 0
 		};
 		for (const { group, id, role } of findStateGroups(root)) {
-			if (!isLive$1(group) || !group.parent) continue;
+			if (!isLive$3(group) || !group.parent) continue;
 			convertStateGroup(group, id, role, results);
 		}
 		if (results.states + results.composites + results.pseudo + results.notes > 0) nestIntoClusters(root);
 		return results;
+	}
+	//#endregion
+	//#region plugin/src/treemapGeometry.ts
+	var near = (a, b, tol) => Math.abs(a - b) <= tol;
+	/** True when `outer` contains `inner` (within `tol`) and is strictly larger in at least one axis. */
+	function containsStrict(outer, inner, tol = 1) {
+		if (!(inner.x >= outer.x - tol && inner.y >= outer.y - tol && inner.x + inner.width <= outer.x + outer.width + tol && inner.y + inner.height <= outer.y + outer.height + tol)) return false;
+		return outer.width > inner.width + tol || outer.height > inner.height + tol;
+	}
+	/** Index of the smallest rect that strictly contains each rect (-1 = top level). */
+	function parentIndices(rects, tol = 1) {
+		return rects.map((r, i) => {
+			let best = -1;
+			for (let j = 0; j < rects.length; j++) {
+				if (j === i || !containsStrict(rects[j], r, tol)) continue;
+				if (best < 0 || rects[j].width * rects[j].height < rects[best].width * rects[best].height) best = j;
+			}
+			return best;
+		});
+	}
+	/**
+	* The invisible header strip of a section: a vector as wide as the section box, starting at its top-left
+	* corner and clearly shorter. `candidates` are the group's other (unpainted) vectors. Returns its index or -1.
+	*/
+	function pickHeader(box, candidates) {
+		let best = -1;
+		candidates.forEach((c, i) => {
+			if (!near(c.x, box.x, 1) || !near(c.y, box.y, 1) || !near(c.width, box.width, 1)) return;
+			if (c.height >= box.height - 1) return;
+			if (best < 0 || c.height > candidates[best].height) best = i;
+		});
+		return best;
+	}
+	/**
+	* Section header texts: the name starts at the left, the value is right aligned. With a single text it is
+	* the name when bold or in the left half, else the value (the unnamed root section only has a value).
+	*/
+	function sectionTextRoles(box, texts) {
+		if (texts.length === 0) return {
+			name: -1,
+			value: -1
+		};
+		const order = texts.map((_, i) => i).sort((a, b) => texts[a].x - texts[b].x);
+		if (texts.length === 1) {
+			const t = texts[0];
+			return t.weight >= 600 || t.x + t.width / 2 < box.x + box.width / 2 ? {
+				name: 0,
+				value: -1
+			} : {
+				name: -1,
+				value: 0
+			};
+		}
+		return {
+			name: order[0],
+			value: order[order.length - 1]
+		};
+	}
+	var r2 = (v) => Math.round(v * 100) / 100;
+	/**
+	* Horizontal Auto Layout for a section header: the name keeps its left offset, the value keeps its right
+	* offset (SPACE_BETWEEN pushes them apart), both stay vertically where Mermaid put them (padding asymmetry).
+	*/
+	function headerSpec(header, name, value) {
+		const items = [name, value].filter((t) => Boolean(t));
+		const primary = name && value ? "SPACE_BETWEEN" : value ? "MAX" : "MIN";
+		const paddingLeft = name ? Math.max(0, r2(name.x - header.x)) : 0;
+		const paddingRight = value ? Math.max(0, r2(header.x + header.width - (value.x + value.width))) : 0;
+		let paddingTop = 0;
+		let paddingBottom = 0;
+		if (items.length > 0) {
+			const pad = offsetToPadding(items.reduce((s, t) => s + (t.y + t.height / 2), 0) / items.length - (header.y + header.height / 2), .5);
+			paddingTop = Math.min(pad.start, header.height);
+			paddingBottom = Math.min(pad.end, header.height);
+		}
+		return {
+			primary,
+			paddingLeft,
+			paddingRight,
+			paddingTop,
+			paddingBottom
+		};
+	}
+	/**
+	* Leaf label + value: a vertical stack centered in the box. `centers`/`heights` are the texts' original
+	* vertical centers (box-relative) and their NEW heights. The gap between the texts is kept and the stack's
+	* vertical offset from the box center becomes padding asymmetry. Horizontally the texts are simply centered:
+	* Mermaid centers them in the leaf, and the x offsets measured on the import only reflect the importer's
+	* text width estimate (a systematic -3px was seen on 36px labels), not intent.
+	*/
+	function stackSpec(box, centers, heights) {
+		const { itemSpacing } = stackPadding(centers, heights, 0);
+		const n = centers.length;
+		if (n === 0) return {
+			itemSpacing: 0,
+			paddingTop: 0,
+			paddingBottom: 0
+		};
+		const total = heights.reduce((s, h) => s + h, 0) + itemSpacing * (n - 1);
+		const pad = offsetToPadding(centers[0] - heights[0] / 2 + total / 2 - box.height / 2, .5);
+		return {
+			itemSpacing,
+			paddingTop: Math.min(pad.start, box.height),
+			paddingBottom: Math.min(pad.end, box.height)
+		};
+	}
+	var money = (s) => s.trim();
+	/** `Section: <name> (<value>)`; the unnamed root container is called `Treemap`. */
+	function sectionTitle(name, value) {
+		const n = name.trim() || "Treemap";
+		const v = money(value);
+		return v ? `Section: ${n} (${v})` : `Section: ${n}`;
+	}
+	/** `Leaf: <label> (<value>)`. */
+	function leafTitle(label, value) {
+		const v = money(value);
+		return v ? `Leaf: ${label.trim()} (${v})` : `Leaf: ${label.trim()}`;
+	}
+	//#endregion
+	//#region plugin/src/treemap.ts
+	var TREEMAP_SECTION_KIND = "Treemap Section";
+	var TREEMAP_LEAF_KIND = "Treemap Leaf";
+	var isLive$2 = (n) => Boolean(n) && !n.removed;
+	var weightOf$1 = (t) => typeof t.fontWeight === "number" ? t.fontWeight : t.fontName && /bold/i.test(t.fontName.style || "") ? 700 : 400;
+	var textFacts = (t) => {
+		return _objectSpread2(_objectSpread2({}, absRect(t)), {}, { weight: weightOf$1(t) });
+	};
+	var sizedVector = (v) => Math.round(v.width) !== 0 && Math.round(v.height) !== 0;
+	function readEntries(root) {
+		const out = [];
+		let order = 0;
+		const visit = (n) => {
+			if (!isLive$2(n) || !("children" in n)) return;
+			for (const c of [...n.children]) {
+				if (!isLive$2(c) || c.type !== "GROUP") continue;
+				const kids = c.children.filter(isLive$2);
+				const vectors = kids.filter((k) => k.type === "VECTOR" && sizedVector(k));
+				const texts = kids.filter((k) => k.type === "TEXT" && (k.characters || "").trim().length > 0);
+				if (kids.some((k) => k.type === "GROUP" || k.type === "FRAME") || vectors.length === 0) {
+					visit(c);
+					continue;
+				}
+				const box = vectors.reduce((a, b) => b.width * b.height > a.width * a.height ? b : a);
+				const boxRect = absRect(box);
+				const unpainted = vectors.filter((v) => v !== box).filter((v) => !hasFill(v) && !hasStroke(v));
+				const hi = pickHeader(boxRect, unpainted.map(absRect));
+				const header = hi >= 0 ? unpainted[hi] : null;
+				const bold = texts.some((t) => weightOf$1(t) >= 600);
+				out.push({
+					group: c,
+					kind: header || bold ? "section" : "leaf",
+					box,
+					header,
+					vectors,
+					texts,
+					abs: boxRect,
+					order: order++,
+					parent: -1
+				});
+			}
+		};
+		visit(root);
+		return out;
+	}
+	function paintFrame(frame, vec) {
+		frame.fills = hasFill(vec) ? cloneAll(vec.fills) : [];
+		frame.strokes = [];
+		if (hasStroke(vec)) applyStroke(frame, vec, Array.isArray(vec.dashPattern) ? vec.dashPattern : []);
+		frame.cornerRadius = 0;
+	}
+	function baseFrame(name, w, h) {
+		const f = figma.createFrame();
+		f.name = name;
+		f.resize(w, h);
+		f.fills = [];
+		f.strokes = [];
+		f.clipsContent = false;
+		return f;
+	}
+	function setAutoLayout(f, mode, primary) {
+		f.layoutMode = mode;
+		f.primaryAxisSizingMode = "FIXED";
+		f.counterAxisSizingMode = "FIXED";
+		f.primaryAxisAlignItems = primary;
+		f.counterAxisAlignItems = "CENTER";
+		f.itemSpacing = 0;
+		f.paddingLeft = 0;
+		f.paddingRight = 0;
+		f.paddingTop = 0;
+		f.paddingBottom = 0;
+	}
+	var clean = (s) => (s || "").trim().replace(/\s+/g, " ");
+	function buildSection(e) {
+		const facts = e.texts.map(textFacts);
+		const roles = sectionTextRoles(e.abs, facts);
+		const nameText = roles.name >= 0 ? e.texts[roles.name] : null;
+		const valueText = roles.value >= 0 ? e.texts[roles.value] : null;
+		const name = nameText ? clean(nameText.characters) : "";
+		const value = valueText ? clean(valueText.characters) : "";
+		const frame = baseFrame(sectionTitle(name, value), e.abs.width, e.abs.height);
+		paintFrame(frame, e.box);
+		tag(frame, "mermapix:kind", TREEMAP_SECTION_KIND);
+		tag(frame, "mermapix:label", name);
+		tag(frame, "mermapix:value", value);
+		e.frame = frame;
+		if (e.texts.length === 0) return;
+		const hdr = e.header ? absRect(e.header) : {
+			x: e.abs.x,
+			y: e.abs.y,
+			width: e.abs.width,
+			height: Math.min(25, e.abs.height)
+		};
+		const spec = headerSpec(hdr, nameText ? facts[roles.name] : null, valueText ? facts[roles.value] : null);
+		const header = baseFrame("Header", hdr.width, hdr.height);
+		setAutoLayout(header, "HORIZONTAL", spec.primary);
+		header.paddingLeft = spec.paddingLeft;
+		header.paddingRight = spec.paddingRight;
+		header.paddingTop = spec.paddingTop;
+		header.paddingBottom = spec.paddingBottom;
+		frame.appendChild(header);
+		header.x = hdr.x - e.abs.x;
+		header.y = hdr.y - e.abs.y;
+		tag(header, "mermapix:kind", "Treemap Header");
+		const ordered = [nameText, valueText].filter(Boolean);
+		for (const t of e.texts) if (!ordered.includes(t)) ordered.push(t);
+		for (const t of ordered) {
+			styleShapeText(t);
+			try {
+				t.textAlignHorizontal = t === valueText ? "RIGHT" : "LEFT";
+			} catch (_unused) {}
+			header.appendChild(t);
+		}
+	}
+	function buildLeaf(e) {
+		const texts = [...e.texts].sort((a, b) => a.y - b.y);
+		const label = texts.length > 0 ? clean(texts[0].characters) : "";
+		const value = texts.length > 1 ? clean(texts[texts.length - 1].characters) : "";
+		const frame = baseFrame(leafTitle(label || "Leaf", value), e.abs.width, e.abs.height);
+		setAutoLayout(frame, "VERTICAL", "CENTER");
+		paintFrame(frame, e.box);
+		tag(frame, "mermapix:kind", TREEMAP_LEAF_KIND);
+		tag(frame, "mermapix:label", label);
+		tag(frame, "mermapix:value", value);
+		e.frame = frame;
+		const centers = texts.map((t) => {
+			const a = absRect(t);
+			return a.y + a.height / 2 - e.abs.y;
+		});
+		for (const t of texts) {
+			styleShapeText(t);
+			try {
+				if (typeof t.fontSize === "number") t.lineHeight = {
+					unit: "PIXELS",
+					value: t.fontSize
+				};
+			} catch (_unused2) {}
+			frame.appendChild(t);
+		}
+		const spec = stackSpec({
+			x: 0,
+			y: 0,
+			width: e.abs.width,
+			height: e.abs.height
+		}, centers, texts.map((t) => t.height));
+		frame.itemSpacing = spec.itemSpacing;
+		frame.paddingTop = spec.paddingTop;
+		frame.paddingBottom = spec.paddingBottom;
+	}
+	function convertTreemap(root) {
+		const entries = readEntries(root);
+		const res = {
+			sections: 0,
+			leaves: 0
+		};
+		if (entries.length === 0) return res;
+		const parents = parentIndices(entries.map((e) => e.abs));
+		entries.forEach((e, i) => {
+			e.parent = parents[i];
+			while (e.parent >= 0 && entries[e.parent].kind === "leaf") e.parent = parents[e.parent];
+		});
+		const slots = /* @__PURE__ */ new Map();
+		for (const e of entries) if (e.parent < 0) slots.set(e, {
+			parent: e.group.parent,
+			index: e.group.parent.children.indexOf(e.group)
+		});
+		for (const e of entries) if (e.kind === "section") {
+			buildSection(e);
+			res.sections++;
+		} else {
+			buildLeaf(e);
+			res.leaves++;
+		}
+		const byOrder = [...entries].sort((a, b) => a.order - b.order);
+		for (const e of byOrder) if (e.parent >= 0) {
+			const p = entries[e.parent];
+			p.frame.appendChild(e.frame);
+			e.frame.x = e.abs.x - p.abs.x;
+			e.frame.y = e.abs.y - p.abs.y;
+		}
+		for (const e of byOrder) {
+			const slot = slots.get(e);
+			if (!slot) continue;
+			const at = Math.min(slot.index, slot.parent.children.length);
+			slot.parent.insertChild(at, e.frame);
+			const o = childOrigin(slot.parent);
+			e.frame.x = e.abs.x - o.x;
+			e.frame.y = e.abs.y - o.y;
+		}
+		for (const e of entries) {
+			for (const v of e.vectors) if (isLive$2(v)) try {
+				v.remove();
+			} catch (_unused3) {}
+			let g = e.group;
+			while (isLive$2(g) && g.type === "GROUP" && g.children.length === 0) {
+				const up = g.parent;
+				try {
+					g.remove();
+				} catch (_unused4) {}
+				g = up;
+			}
+		}
+		return res;
+	}
+	//#endregion
+	//#region plugin/src/railroadGeometry.ts
+	/** `aria-roledescription` values of the four railroad grammar diagram types. */
+	var RAILROAD_TYPES = [
+		"railroad",
+		"railroadEbnf",
+		"railroadAbnf",
+		"railroadPeg"
+	];
+	function isRailroadType(type) {
+		return RAILROAD_TYPES.includes(String(type || ""));
+	}
+	/** `? text ?` is Mermaid's special-sequence label (also used for PEG `&x` / `!x` predicates). */
+	function isSpecialLabel(text) {
+		return /^\?\s[\s\S]*\s\?$/.test(String(text || "").trim());
+	}
+	/** Terminal = rounded box (rx 10), non-terminal / special = square box. */
+	function boxKind(cornerRadius, text) {
+		if (cornerRadius > .5) return "Terminal";
+		return isSpecialLabel(text) ? "Special" : "NonTerminal";
+	}
+	/** The bold rule-name text is `<name> =`. Returns the bare name, or null when the text is not a rule name. */
+	function ruleNameOf(text, weight) {
+		if (weight < 600) return null;
+		const m = String(text || "").trim().match(/^([\s\S]*\S)\s*=$/);
+		return m ? m[1].trim() : null;
+	}
+	var boxTitle = (kind, text) => `${kind}: ${String(text || "").trim()}`;
+	/** Start is the leftmost marker of a rule, End the rightmost; anything else stays a plain `Marker`. */
+	function markerNames(xs) {
+		if (xs.length !== 2) return xs.map(() => "Marker");
+		return xs[0] <= xs[1] ? ["Start", "End"] : ["End", "Start"];
+	}
+	//#endregion
+	//#region plugin/src/railroad.ts
+	var RAILROAD_RULE_PREFIX = "Rule: ";
+	var isLive$1 = (n) => Boolean(n) && !n.removed;
+	var weightOf = (t) => typeof t.fontWeight === "number" ? t.fontWeight : t.fontName && /bold/i.test(t.fontName.style || "") ? 700 : 400;
+	var liveKids = (n) => n && "children" in n ? n.children.filter(isLive$1) : [];
+	/** The group holding only the bold `<name> =` text of a rule. */
+	function nameGroupOf(rule) {
+		for (const c of liveKids(rule)) {
+			if (c.type !== "GROUP") continue;
+			const kids = liveKids(c);
+			if (kids.length !== 1 || kids[0].type !== "TEXT") continue;
+			const name = ruleNameOf(kids[0].characters || "", weightOf(kids[0]));
+			if (name !== null) return {
+				group: c,
+				text: kids[0],
+				name
+			};
+		}
+		return null;
+	}
+	function findRules(root) {
+		const out = [];
+		const visit = (n) => {
+			for (const c of liveKids(n)) {
+				if (c.type !== "GROUP") continue;
+				const ng = nameGroupOf(c);
+				if (ng) out.push({
+					group: c,
+					nameGroup: ng
+				});
+				else visit(c);
+			}
+		};
+		visit(root);
+		return out;
+	}
+	/** Leaf-level groups (no group/frame children) below `rule`, in z-order. */
+	function leafGroups(rule) {
+		const out = [];
+		const visit = (n) => {
+			for (const c of liveKids(n)) {
+				if (c.type !== "GROUP") continue;
+				if (liveKids(c).some((k) => k.type === "GROUP" || k.type === "FRAME")) visit(c);
+				else out.push(c);
+			}
+		};
+		visit(rule);
+		return out;
+	}
+	/** Moves every child of nested GROUPs up into `rule`, preserving z-order, and deletes the emptied groups. */
+	function flattenInto(rule) {
+		let guard = 0;
+		let again = true;
+		while (again && guard++ < 50) {
+			again = false;
+			for (const c of [...rule.children]) {
+				if (c.type !== "GROUP") continue;
+				const at = rule.children.indexOf(c);
+				[...c.children].forEach((k, i) => rule.insertChild(at + i, k));
+				try {
+					c.remove();
+				} catch (_unused) {}
+				again = true;
+			}
+		}
+	}
+	function convertRailroad(root) {
+		const res = {
+			rules: 0,
+			terminals: 0,
+			nonTerminals: 0,
+			specials: 0
+		};
+		for (const { group: rule, nameGroup } of findRules(root)) {
+			const circles = [];
+			for (const g of leafGroups(rule)) {
+				if (g === nameGroup.group) continue;
+				const parts = collectParts(g);
+				if (parts.others.length > 0 || parts.vectors.length !== 1) continue;
+				const v = parts.vectors[0];
+				const cls = classifyShape(pathDataOf(v), v.width, v.height);
+				if (parts.texts.length === 1) {
+					if (!cls.rectLike || !hasStroke(v) && !hasFill(v)) continue;
+					const converted = convertShapeGroup(g);
+					if (!converted) continue;
+					const kind = boxKind(cls.cornerRadius, converted.label);
+					converted.frame.name = boxTitle(kind, converted.label);
+					tag(converted.frame, "mermapix:kind", `Railroad ${kind}`);
+					tag(converted.frame, "mermapix:label", converted.label);
+					if (kind === "Terminal") res.terminals++;
+					else if (kind === "Special") res.specials++;
+					else res.nonTerminals++;
+				} else if (parts.texts.length === 0 && cls.kind === "Circle" && hasFill(v)) circles.push({
+					v,
+					x: absRect(v).x
+				});
+			}
+			const names = markerNames(circles.map((c) => c.x));
+			circles.forEach((c, i) => {
+				const cls = classifyShape(pathDataOf(c.v), c.v.width, c.v.height);
+				tag(paintFrameFromVectors([c.v], cls, names[i]), "mermapix:kind", `Railroad ${names[i]}`);
+			});
+			const t = nameGroup.text;
+			const a = absRect(t);
+			const cy = a.y + a.height / 2;
+			styleShapeText(t);
+			try {
+				t.textAlignHorizontal = "LEFT";
+			} catch (_unused2) {}
+			t.y = cy - t.height / 2 - childOrigin(t.parent).y;
+			t.name = `${nameGroup.name} =`;
+			const nameTracks = (n) => {
+				for (const c of liveKids(n)) if (c.type === "VECTOR") c.name = "Track";
+				else if (c.type === "GROUP") nameTracks(c);
+			};
+			nameTracks(rule);
+			flattenInto(rule);
+			rule.name = `${RAILROAD_RULE_PREFIX}${nameGroup.name}`;
+			tag(rule, "mermapix:kind", "Railroad Rule");
+			res.rules++;
+		}
+		return res;
 	}
 	//#endregion
 	//#region plugin/src/genericGeometry.ts
@@ -3971,6 +4485,15 @@
 			return "";
 		}
 	};
+	/** Frame kinds (`mermapix:kind`) produced by dedicated converters: ERD tables, treemap (9.2), railroad (9.2). */
+	var STRUCTURED_KINDS = new Set([
+		"ERD Table",
+		"Treemap Section",
+		"Treemap Leaf",
+		"Railroad Terminal",
+		"Railroad NonTerminal",
+		"Railroad Special"
+	]);
 	/** True when an earlier step already built native structure (so this fallback must stay away). */
 	function isStructured(root) {
 		let found = false;
@@ -3980,12 +4503,12 @@
 				if (!isLive(c)) continue;
 				if (c.type === "GROUP") {
 					const name = String(c.name || "");
-					if (name === "Connectors" || isSequenceGroupName(name.toLowerCase())) {
+					if (name === "Connectors" || isSequenceGroupName(name.toLowerCase()) || readData(c, "mermapix:kind") === "Railroad Rule") {
 						found = true;
 						return;
 					}
 				} else if (c.type === "FRAME") {
-					if (readData(c, "mermapix:node") !== "" || readData(c, "mermapix:cluster") !== "" || readData(c, "mermapix:kind") === "ERD Table") {
+					if (readData(c, "mermapix:node") !== "" || readData(c, "mermapix:cluster") !== "" || STRUCTURED_KINDS.has(readData(c, "mermapix:kind"))) {
 						found = true;
 						return;
 					}
@@ -4206,7 +4729,7 @@
 				const name = (child.name || "").toLowerCase();
 				const isGeneric = name === "group" || name === "" || name === "label" || name.startsWith("root-") || name === "edgepath" || name === "edgelabel";
 				const isSingleChild = child.children.length === 1;
-				const isProtectedNode = name.includes("flowchart-") || name.includes("entity-") || name.includes("actor") || name.includes("subgraph") || name.includes("cluster") || name.includes("inlined-marker") || name.includes("marker") || name.startsWith("edge: ") || name === "connectors" || isSequenceGroupName(name);
+				const isProtectedNode = name.includes("flowchart-") || name.includes("entity-") || name.includes("actor") || name.includes("subgraph") || name.includes("cluster") || name.includes("inlined-marker") || name.includes("marker") || name.startsWith("edge: ") || name.startsWith("rule: ") || name === "connectors" || isSequenceGroupName(name);
 				if ((isGeneric || isSingleChild) && !isProtectedNode) {
 					const childIndex = parent.children.indexOf(child);
 					const grandChildren = [...child.children];
@@ -4340,6 +4863,24 @@
 			}
 		},
 		{
+			name: "treemap",
+			run: (rootNode, _theme, ctx) => {
+				if (!ctx || ctx.diagramType !== "treemap") return;
+				try {
+					convertTreemap(rootNode);
+				} catch (_unused4) {}
+			}
+		},
+		{
+			name: "railroad",
+			run: (rootNode, _theme, ctx) => {
+				if (!ctx || !isRailroadType(ctx.diagramType)) return;
+				try {
+					convertRailroad(rootNode);
+				} catch (_unused5) {}
+			}
+		},
+		{
 			name: "edge-labels",
 			run: (rootNode) => {
 				convertEdgeLabels(rootNode);
@@ -4356,7 +4897,7 @@
 			run: (rootNode, _theme, ctx) => {
 				try {
 					applyGenericFallback(rootNode, ctx && ctx.diagramType);
-				} catch (_unused4) {}
+				} catch (_unused6) {}
 			}
 		}
 	];
@@ -4374,7 +4915,7 @@
 				opacity: 1,
 				visible: true
 			}];
-		} catch (_unused5) {}
+		} catch (_unused7) {}
 	}
 	function optimizeDiagramNodes(rootNode, themeVariables, diagramType) {
 		purgeJunkNodes(rootNode);

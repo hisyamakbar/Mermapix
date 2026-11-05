@@ -21,6 +21,9 @@ import { convertEdgeLabels } from './edgeLabels.ts'
 import { convertSequence } from './sequence.ts'
 import { convertClasses, convertClassInterfaces, convertClassNotes } from './class.ts'
 import { convertStates } from './state.ts'
+import { convertTreemap } from './treemap.ts'
+import { convertRailroad } from './railroad.ts'
+import { isRailroadType } from './railroadGeometry.ts'
 import { applyGenericFallback } from './generic.ts'
 import { parseColorToFigma } from './theme.ts'
 import {
@@ -103,6 +106,32 @@ const stateStep: DiagramStep = {
   },
 }
 
+/** treemap (Phase 9.2): sections and leaves -> nested frames with merged paint, header / centered labels. */
+const treemapStep: DiagramStep = {
+  name: 'treemap',
+  run: (rootNode, _theme, ctx) => {
+    if (!ctx || ctx.diagramType !== 'treemap') return
+    try {
+      convertTreemap(rootNode)
+    } catch {
+      // Never abort the insert: a partially converted tree is still valid Figma content.
+    }
+  },
+}
+
+/** railroad / ebnf / abnf / peg grammars (Phase 9.2): terminals, non-terminals, markers, tracks, rules. */
+const railroadStep: DiagramStep = {
+  name: 'railroad',
+  run: (rootNode, _theme, ctx) => {
+    if (!ctx || !isRailroadType(ctx.diagramType)) return
+    try {
+      convertRailroad(rootNode)
+    } catch {
+      // see treemapStep
+    }
+  },
+}
+
 /** Edge/relationship labels of every diagram type; must run after the node/table steps. */
 const edgeLabelStep: DiagramStep = {
   name: 'edge-labels',
@@ -139,7 +168,7 @@ const genericStep: DiagramStep = {
 }
 
 /** Per-diagram-type steps, executed in order between the initial purge and the generic cleanup. */
-export const DIAGRAM_STEPS: DiagramStep[] = [erdStep, flowchartStep, sequenceStep, classStep, stateStep, edgeLabelStep, connectorsStep, genericStep]
+export const DIAGRAM_STEPS: DiagramStep[] = [erdStep, flowchartStep, sequenceStep, classStep, stateStep, treemapStep, railroadStep, edgeLabelStep, connectorsStep, genericStep]
 
 /**
  * Figma imports the SVG root as a frame whose white fill is not shown (canvas shows through),

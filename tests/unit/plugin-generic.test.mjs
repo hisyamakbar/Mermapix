@@ -10,6 +10,8 @@ import { metrics, relBounds, isGenericName } from '../plugin-mock/survey-metrics
 import { diagramTypeFromSvg } from '../../plugin/src/genericGeometry.ts'
 
 const THEMES = ['dark', 'light']
+// Types that got a dedicated converter after 8.5 (the generic fallback must now stay away from them): treemap (9.2).
+const DEDICATED = new Set(['treemap'])
 const all = (tree, pred) => { const out = []; walk(tree, (n, p) => pred(n, p) && out.push(n)); return out }
 const near = (a, b, tol = 0.5) => Math.abs(a - b) <= tol
 const rectKey = (b) => `${b.x.toFixed(1)},${b.y.toFixed(1)},${b.width.toFixed(1)},${b.height.toFixed(1)}`
@@ -27,6 +29,15 @@ for (const theme of THEMES) {
       assert.ok(roleType, 'payload carries aria-roledescription')
       const before = importSvg({ ids: 0 }, run.svgSeen)
       assert.ok(!run.log.some((l) => l[0] === 'notify' && l[1][1] && l[1][1].error), 'no error notification')
+
+      if (DEDICATED.has(type)) {
+        // dedicated converter (plugin-treemap.test.mjs): fallback skipped, nothing generic left, texts zero-drop
+        assert.ok(!(run.root.pluginData && run.root.pluginData['mermapix:fallback']), 'fallback skipped on a dedicated type')
+        const t = (tr) => all(tr, (n) => n.type === 'TEXT' && n.characters.trim()).map((n) => n.characters.trim()).sort()
+        assert.deepEqual(t(run.root), t(before))
+        assert.equal(metrics(plain(run.root)).generic, 0)
+        return
+      }
 
       // runs, and says so
       assert.ok(run.root.pluginData && run.root.pluginData['mermapix:fallback'], 'fallback ran on a type without a dedicated converter')
@@ -63,8 +74,8 @@ for (const theme of THEMES) {
   }
 }
 
-test('chart types are never restyled or moved: pie / gantt / xychart / quadrant / sankey / packet / treemap / radar / venn / gitGraph / timeline / journey only get names', async () => {
-  const CHARTS = ['pie', 'gantt', 'xychart', 'quadrant', 'sankey', 'packet', 'treemap', 'radar', 'venn', 'gitgraph', 'timeline', 'journey']
+test('chart types are never restyled or moved: pie / gantt / xychart / quadrant / sankey / packet / radar / venn / gitGraph / timeline / journey only get names', async () => {
+  const CHARTS = ['pie', 'gantt', 'xychart', 'quadrant', 'sankey', 'packet', 'radar', 'venn', 'gitgraph', 'timeline', 'journey']
   for (const type of CHARTS) {
     for (const theme of THEMES) {
       const run = await runSurvey(type, theme)
@@ -107,7 +118,7 @@ test('node diagrams: single-label cards and stacked pairs become frames, everyth
 test('dedicated diagram types are never touched by the fallback (gate)', async () => {
   const cases = []
   for (const theme of THEMES) {
-    for (const ex of [...EXAMPLES, ...FLOW_EXAMPLES, '8-case-sequence-full', '9-case-class', '10-case-state']) cases.push([ex, theme])
+    for (const ex of [...EXAMPLES, ...FLOW_EXAMPLES, '8-case-sequence-full', '9-case-class', '10-case-state', '37-case-treemap', '38-case-railroad', '39-case-railroad-ebnf']) cases.push([ex, theme])
   }
   for (const [ex, theme] of cases) {
     const run = await runFixture(ex, theme)

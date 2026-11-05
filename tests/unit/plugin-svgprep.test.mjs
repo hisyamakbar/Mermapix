@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ensureMarkersInlined, nameInlinedMarkers, prepareSvgForFigma } from '../../plugin/src/svgPrep.ts'
+import zlib from 'node:zlib'
+import { ensureMarkersInlined, nameInlinedMarkers, prepareSvgForFigma, stripLabelClipPaths } from '../../plugin/src/svgPrep.ts'
 import { inlineSvgMarkers } from '../../src/export/markers.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -73,3 +74,55 @@ for (const [file, forbidden, expected] of [
     assert.equal(count(prepareSvgForFigma(out), /class="inlined-marker /g), total)
   })
 }
+
+// ---------------------------------------------------------------- Phase 9.2: label clipPaths
+
+const CLIPPED = '<svg><g><rect width="10" height="5" fill="none"/><clipPath id="clip-a" fill="red"><rect width="8" height="5" fill="red"/></clipPath><rect width="10" height="40" fill="blue"/><text clip-path="url(#clip-a)" font-size="12"><tspan x="1" y="2">A</tspan></text><text clip-path="url(#clip-a)"><tspan x="1" y="2">B</tspan></text></g></svg>'
+
+test('stripLabelClipPaths drops clipPaths that only clip text, with every clip-path reference', () => {
+  const out = stripLabelClipPaths(CLIPPED)
+  assert.ok(!out.includes('clipPath') && !out.includes('clip-path'))
+  assert.equal(count(out, /<rect /g), 2, 'the real rects stay')
+  assert.equal(count(out, /<text[ >]/g), 2)
+  assert.ok(out.includes('<text font-size="12">') && out.includes('<text>'), 'other attributes stay')
+  assert.equal(stripLabelClipPaths(out), out, 'idempotent')
+})
+
+test('stripLabelClipPaths is conservative: shape clips, complex clips, style refs and no-ops are left alone', () => {
+  const shapeClip = '<svg><clipPath id="c"><rect width="8" height="5"/></clipPath><g clip-path="url(#c)"><rect width="9" height="9"/></g></svg>'
+  assert.equal(stripLabelClipPaths(shapeClip), shapeClip, 'clip on a group of shapes')
+  const mixed = '<svg><clipPath id="c"><rect width="8" height="5"/></clipPath><text clip-path="url(#c)">a</text><rect clip-path="url(#c)" width="1" height="1"/></svg>'
+  assert.equal(stripLabelClipPaths(mixed), mixed, 'one shape reference keeps the clipPath for everyone')
+  const multi = '<svg><clipPath id="c"><rect width="8" height="5"/><circle r="2"/></clipPath><text clip-path="url(#c)">a</text></svg>'
+  assert.equal(stripLabelClipPaths(multi), multi, 'multi-shape clipPath')
+  const styled = '<svg><clipPath id="c"><rect width="8" height="5"/></clipPath><text clip-path="url(#c)" style="clip-path:url(#c)">a</text></svg>'
+  assert.equal(stripLabelClipPaths(styled), styled, 'unknown mention of the id')
+  assert.equal(stripLabelClipPaths('<svg><rect/></svg>'), '<svg><rect/></svg>')
+  assert.equal(stripLabelClipPaths(''), '')
+})
+
+test('stripLabelClipPaths handles several clipPaths, an unreferenced one, and id characters', () => {
+  const svg = '<svg><clipPath id="clip.1+x"><path d="M0 0 L1 1"/></clipPath><clipPath id="unused"><rect width="1" height="1"></rect></clipPath><clipPath id="keep"><rect/></clipPath><text clip-path="url(#clip.1+x)">a</text><g clip-path="url(#keep)"/></svg>'
+  const out = stripLabelClipPaths(svg)
+  assert.ok(!out.includes('clip.1+x') && !out.includes('unused'))
+  assert.ok(out.includes('<clipPath id="keep">') && out.includes('<g clip-path="url(#keep)"/>'))
+})
+
+test('the treemap payload loses all 15 clipPaths and 24 references; prepareSvgForFigma applies it', () => {
+  const raw = read('../fixtures/plugin/37-case-treemap-light.svg')
+  assert.equal(count(raw, /<clipPath /g), 15)
+  assert.equal(count(raw, /clip-path=/g), 24)
+  const out = stripLabelClipPaths(raw)
+  assert.equal(count(out, /<clipPath|clip-path=/g), 0)
+  assert.equal(count(out, /<rect /g), count(raw, /<rect /g) - 15)
+  assert.equal(count(out, /<tspan /g), count(raw, /<tspan /g))
+  assert.equal(prepareSvgForFigma(raw), stripLabelClipPaths(raw), 'treemap has no markers: only the clip step changes it')
+})
+
+test('every other payload (examples, cases, 26 survey types, dark + light) has no clipPath and is returned untouched', () => {
+  const dir = path.resolve(here, '../fixtures/plugin')
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.svg') && !f.startsWith('37-')).map((f) => fs.readFileSync(path.join(dir, f), 'utf8'))
+  const survey = fs.readdirSync(path.join(dir, 'survey')).filter((f) => !f.startsWith('treemap')).map((f) => zlib.gunzipSync(fs.readFileSync(path.join(dir, 'survey', f))).toString('utf8'))
+  assert.ok(files.length >= 20 && survey.length >= 40)
+  for (const svg of [...files, ...survey]) assert.equal(stripLabelClipPaths(svg), svg)
+})

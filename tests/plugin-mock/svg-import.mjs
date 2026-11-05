@@ -7,6 +7,10 @@
 //  - every <text>         -> ONE TEXT node (Arial, textAutoResize WIDTH_AND_HEIGHT, LEFT aligned)
 //  - root                 -> FRAME whose fills hold a white paint (canvas still showed through)
 //  - <defs>/<marker>/<title>/<style>... are ignored
+//  - an inline <clipPath> (outside <defs>, Mermaid's treemap puts one in every section/leaf) is NOT a mask for
+//    Figma's importer: its content lands as a visible shape inside a GROUP named by the clipPath id, painted with
+//    the fill inherited from the ancestors (observed in real Figma: a black rect over the colored section rect).
+//    `clip-path` attributes themselves are ignored.
 // Coordinates: x/y of every node are relative to the root frame (GROUP children are relative to
 // their nearest FRAME ancestor, which is the root frame for the whole imported tree).
 // VECTOR bounds are the geometry bounds (stroke not included) and vectorPaths hold path data
@@ -231,7 +235,7 @@ function commandsToData(cmds, ox, oy) {
 
 // ---------------------------------------------------------------- importer
 
-const SKIP_TAGS = new Set(['defs', 'marker', 'title', 'desc', 'style', 'filter', 'lineargradient', 'radialgradient', 'clippath', 'mask', 'pattern', 'symbol', 'metadata', 'foreignobject'])
+const SKIP_TAGS = new Set(['defs', 'marker', 'title', 'desc', 'style', 'filter', 'lineargradient', 'radialgradient', 'mask', 'pattern', 'symbol', 'metadata', 'foreignobject'])
 const INHERITED = ['fill', 'fill-opacity', 'stroke', 'stroke-opacity', 'stroke-width', 'stroke-dasharray', 'opacity', 'font-size', 'font-weight', 'font-family', 'text-anchor']
 
 function styleAttrs(el) {
@@ -346,7 +350,7 @@ export function importSvg(env, svgText) {
     for (const k of INHERITED) if (own[k] !== undefined) style[k] = own[k]
     if (own.opacity !== undefined && inherited.opacity !== undefined) style.opacity = String(num(own.opacity, 1) * num(inherited.opacity, 1))
     const m = mul(parentM, parseTransform(own.transform))
-    if (tag === 'g' || tag === 'a') {
+    if (tag === 'g' || tag === 'a' || tag === 'clippath') {
       const g = new MockNode(env, 'GROUP', { name: el.attrs.id || 'Group' })
       parentNode.appendChild(g)
       for (const c of el.children) walk(c, g, style, m)

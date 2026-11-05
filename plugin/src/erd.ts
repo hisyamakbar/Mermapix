@@ -237,6 +237,9 @@ export function convertErdTables(rootNode: any, themeVariables?: Record<string, 
     // 1. Create Table Card Frame (Vertical Auto Layout: FIXED width and FIXED height matching Mermaid 1:1)
     const tableCard = figma.createFrame()
     tableCard.name = tableName
+    try {
+      tableCard.setPluginData('mermapix:kind', 'ERD Table')
+    } catch {}
     tableCard.x = tableX
     tableCard.y = tableY
     tableCard.layoutMode = 'VERTICAL'

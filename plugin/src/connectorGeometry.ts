@@ -41,13 +41,67 @@ export function smallestContainer<T extends Rect>(item: Rect, candidates: T[], t
 // ---------------------------------------------------------------- ids and names
 
 const EDGE_NAME_RE = /(?:^|-)L_(.+)_(\d+)$/
+/** classDiagram relations: `<svgId>-id_<from>_<to>_<n>` (ERD `id_entity-…` edges are not matched). */
+const CLASS_EDGE_NAME_RE = /(?:^|-)id_(.+)_(\d+)$/
+/** stateDiagram transitions (`edge<n>`) and note/class-note connectors carry no ids at all. */
+const ANON_EDGE_NAME_RE = /(?:^|-)(?:edge|edgeNote)\d+$|----note-\d+(?:-.*)?$/
 
 /** Mermaid edge layer names look like `<svgId>-L_<from>_<to>_<n>`. Returns `<from>_<to>` or null. */
 export function edgeBodyFromName(name: string | null | undefined): string | null {
   if (!name || typeof name !== 'string') return null
   if (name.includes('inlined-marker')) return null
   const m = EDGE_NAME_RE.exec(name)
-  return m ? m[1] : null
+  if (m) return m[1]
+  if (!name.includes('entity-')) {
+    const c = CLASS_EDGE_NAME_RE.exec(name)
+    if (c) return c[1]
+  }
+  return null
+}
+
+/** True for connector layer names without from/to ids (state transitions, note connectors). */
+export function isAnonymousEdgeName(name: string | null | undefined): boolean {
+  if (!name || typeof name !== 'string' || name.includes('inlined-marker')) return false
+  return ANON_EDGE_NAME_RE.test(name)
+}
+
+export interface EdgeTarget {
+  id: string
+  rect: Rect
+}
+
+/** Distance from a point to the OUTLINE of a rect (0 on the border, grows inside and outside). */
+export function distanceToRectOutline(p: Pt, r: Rect): number {
+  const dx = Math.max(r.x - p.x, 0, p.x - (r.x + r.width))
+  const dy = Math.max(r.y - p.y, 0, p.y - (r.y + r.height))
+  if (dx > 0 || dy > 0) return Math.hypot(dx, dy)
+  return Math.min(p.x - r.x, r.x + r.width - p.x, p.y - r.y, r.y + r.height - p.y)
+}
+
+/** The target whose outline is nearest to `p` within `maxDist`, preferring the smaller rect on ties. */
+export function nearestTarget(p: Pt, targets: EdgeTarget[], maxDist = 24): EdgeTarget | null {
+  let best: EdgeTarget | null = null
+  let bestD = Infinity
+  for (const t of targets) {
+    const d = distanceToRectOutline(p, t.rect)
+    if (d < bestD - 0.01 || (Math.abs(d - bestD) <= 0.01 && best && rectArea(t.rect) < rectArea(best.rect))) {
+      best = t
+      bestD = d
+    }
+  }
+  return best && bestD <= maxDist ? best : null
+}
+
+/** from = the target at the start of the polyline, to = the target at its end (null when either is unknown). */
+export function resolveEdgeEndpointsByGeometry(
+  pts: Pt[],
+  targets: EdgeTarget[],
+  maxDist = 24,
+): { from: string; to: string } | null {
+  if (pts.length < 2) return null
+  const a = nearestTarget(pts[0], targets, maxDist)
+  const b = nearestTarget(pts[pts.length - 1], targets, maxDist)
+  return a && b ? { from: a.id, to: b.id } : null
 }
 
 /**

@@ -60,7 +60,7 @@ export function absRect(n: any): Rect {
 
 // ---------------------------------------------------------------- 1. cluster groups -> frames
 
-interface ClusterGroup {
+export interface ClusterGroup {
   group: any
   id: string
   vector: any
@@ -90,7 +90,17 @@ export function findClusterGroups(root: any): ClusterGroup[] {
   return out
 }
 
-function convertClusterGroup(cg: ClusterGroup): ClusterFrame {
+export interface ClusterNaming {
+  /** Layer name prefix (`Subgraph`, `Namespace`, `State`). */
+  prefix: string
+  /** `mermapix:kind` value. */
+  kind: string
+}
+
+const SUBGRAPH_NAMING: ClusterNaming = { prefix: 'Subgraph', kind: 'Subgraph' }
+
+/** Converts one cluster group (single rect vector + title text) into a container frame (exported for 8.5 steps). */
+export function convertClusterGroup(cg: ClusterGroup, naming: ClusterNaming = SUBGRAPH_NAMING): ClusterFrame {
   const { group, vector: v, texts } = cg
   const parentNode = group.parent
   const index = parentNode.children.indexOf(group)
@@ -98,7 +108,7 @@ function convertClusterGroup(cg: ClusterGroup): ClusterFrame {
   const cls = classifyShape(pathDataOf(v), v.width, v.height)
 
   const frame = figma.createFrame()
-  frame.name = `Subgraph: ${title || cg.id}`
+  frame.name = `${naming.prefix}: ${title || cg.id}`
   frame.layoutMode = 'NONE'
   frame.resize(v.width, v.height)
   parentNode.insertChild(index, frame)
@@ -135,13 +145,13 @@ function convertClusterGroup(cg: ClusterGroup): ClusterFrame {
 
   tag(frame, CLUSTER_ID_KEY, cg.id)
   tag(frame, CLUSTER_LABEL_KEY, title || cg.id)
-  tag(frame, 'mermapix:kind', 'Subgraph')
+  tag(frame, 'mermapix:kind', naming.kind)
   return { frame, id: cg.id, title: title || cg.id }
 }
 
 /** Converts every cluster group below `root` into a native frame (document order kept). */
-export function convertClusters(root: any): ClusterFrame[] {
-  return findClusterGroups(root).map(convertClusterGroup)
+export function convertClusters(root: any, naming: ClusterNaming = SUBGRAPH_NAMING): ClusterFrame[] {
+  return findClusterGroups(root).map((cg) => convertClusterGroup(cg, naming))
 }
 
 // ---------------------------------------------------------------- 2. membership

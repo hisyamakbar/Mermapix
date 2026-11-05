@@ -3,6 +3,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import zlib from 'node:zlib'
 import { runPlugin } from './figma-mock.mjs'
 import { importSvg } from './svg-import.mjs'
 
@@ -40,3 +41,20 @@ export function absBounds(n) {
   const o = absOrigin(n.parent)
   return { x: n.x + o.x, y: n.y + o.y, width: n.width, height: n.height }
 }
+
+/** Runs the plugin on an SVG string. */
+export async function runSvg(svg, theme) {
+  const r = await runPlugin(CODE, svg, (env, s) => importSvg(env, s), { theme, themeVariables: THEMES[theme] })
+  return { svg, ...r }
+}
+
+// Phase 8.5 survey payloads (one per remaining Mermaid diagram type, gzipped to keep the repo small).
+export const SURVEY_DIR = path.join(FIXTURE_DIR, 'survey')
+export const SURVEY_TYPES = fs
+  .readdirSync(SURVEY_DIR)
+  .filter((f) => f.endsWith('.svg.gz') && !f.endsWith('-light.svg.gz'))
+  .map((f) => f.replace(/\.svg\.gz$/, ''))
+  .sort()
+export const readSurveySvg = (type, theme) =>
+  zlib.gunzipSync(fs.readFileSync(path.join(SURVEY_DIR, `${type}${theme === 'light' ? '-light' : ''}.svg.gz`))).toString('utf8')
+export const runSurvey = (type, theme) => runSvg(readSurveySvg(type, theme), theme)

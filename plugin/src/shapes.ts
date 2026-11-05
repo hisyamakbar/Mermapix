@@ -125,12 +125,18 @@ export function labelOf(texts: any[]): string {
 export function styleShapeText(t: any): void {
   const original = typeof t.fontWeight === 'number' ? t.fontWeight : t.fontName && /bold/i.test(t.fontName.style || '') ? 700 : 400
   const style = interStyleForWeight(original)
+  const italic = Boolean(t.fontName && /italic/i.test(t.fontName.style || ''))
+  const italicStyle = style === 'Regular' ? 'Italic' : `${style} Italic`
   try {
-    t.fontName = { family: 'Inter', style }
+    t.fontName = { family: 'Inter', style: italic ? italicStyle : style }
   } catch {
     try {
-      t.fontName = { family: 'Inter', style: 'Regular' }
-    } catch {}
+      t.fontName = { family: 'Inter', style }
+    } catch {
+      try {
+        t.fontName = { family: 'Inter', style: 'Regular' }
+      } catch {}
+    }
   }
   try {
     t.textAlignHorizontal = 'CENTER'
@@ -222,6 +228,50 @@ export function convertVectorWithLabel(
   frame.appendChild(text)
   vector.remove()
   tag(frame, 'mermapix:kind', extraTag)
+  return frame
+}
+
+/**
+ * Replaces a stack of identical-bounds vectors (fill path + outline path, Phase 8.5) by ONE fixed-size
+ * frame carrying the merged fill + stroke + dash + corner radius. The frame is inserted into
+ * `parentNode` at `index` (default: where the first vector was). Returns the frame; the vectors are removed.
+ */
+export function paintFrameFromVectors(
+  vectors: any[],
+  cls: ShapeClass,
+  name: string,
+  parentNode?: any,
+  index?: number,
+): any {
+  const v0 = vectors[0]
+  const parent = parentNode || v0.parent
+  const at = index !== undefined ? index : parent.children.indexOf(v0)
+  const merge = mergePaints(
+    vectors.map((vec) => ({
+      hasFill: hasFill(vec),
+      hasStroke: hasStroke(vec),
+      strokeWeight: Number(vec.strokeWeight) || 0,
+      dashPattern: Array.isArray(vec.dashPattern) ? vec.dashPattern : [],
+    })),
+  )
+  const frame = createCenteredFrame({ name, x: 0, y: 0, width: v0.width, height: v0.height })
+  parent.insertChild(Math.max(0, Math.min(at, parent.children.length)), frame)
+  const pos = rebase(v0.x, v0.y, v0.parent, parent)
+  frame.x = pos.x
+  frame.y = pos.y
+  const fillSrc = merge.fillFrom >= 0 ? vectors[merge.fillFrom] : null
+  const strokeSrc = merge.strokeFrom >= 0 ? vectors[merge.strokeFrom] : null
+  frame.fills = fillSrc ? cloneAll(fillSrc.fills) : []
+  if (strokeSrc) applyStroke(frame, strokeSrc, merge.dash)
+  frame.cornerRadius = cls.cornerRadius
+  for (const v of vectors) {
+    if (isLive(v)) {
+      try {
+        v.remove()
+      } catch {}
+    }
+  }
+  tag(frame, 'mermapix:kind', cls.kind)
   return frame
 }
 

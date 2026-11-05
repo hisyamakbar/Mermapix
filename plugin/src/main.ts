@@ -5,6 +5,7 @@
 
 import { prepareSvgForFigma } from './svgPrep.ts'
 import { optimizeDiagramNodes } from './optimize.ts'
+import { diagramTypeFromSvg } from './genericGeometry.ts'
 
 figma.showUI(__html__, {
   width: 500,
@@ -30,6 +31,8 @@ figma.ui.onmessage = async (msg: {
           { family: 'Inter', style: 'Medium' },
           { family: 'Inter', style: 'Semi Bold' },
           { family: 'Inter', style: 'Bold' },
+          { family: 'Inter', style: 'Italic' },
+          { family: 'Inter', style: 'Bold Italic' },
           { family: 'Arial', style: 'Regular' },
           { family: 'Arial', style: 'Bold' },
         ]
@@ -61,7 +64,7 @@ figma.ui.onmessage = async (msg: {
       figma.currentPage.appendChild(node)
 
       // Optimize layers: convert ERD tables to column-based Auto Layout & dissolve redundant groups
-      optimizeDiagramNodes(node, msg.themeVariables)
+      optimizeDiagramNodes(node, msg.themeVariables, diagramTypeFromSvg(msg.svg))
       ensureAllLayersVisible(node)
 
       // Center in current user viewport

@@ -1,0 +1,7 @@
+C4Context
+  title System Context diagram
+  Person(customerA, "Customer", "A customer of the bank")
+  System(SystemAA, "Banking System", "Allows customers to view accounts")
+  System_Ext(SystemE, "Mainframe", "Stores core data")
+  Rel(customerA, SystemAA, "Uses")
+  Rel(SystemAA, SystemE, "Reads from")

@@ -30,6 +30,7 @@ export type MarkerKind =
   | 'aggregation'
   | 'dependency'
   | 'lollipop'
+  | 'contains'
   | 'marker'
 
 export type MarkerPosition = 'start' | 'end'
@@ -47,9 +48,10 @@ export function markerKindFromId(markerId: string | null | undefined): MarkerKin
   if (id.includes('aggregation')) return 'aggregation'
   if (id.includes('dependency')) return 'dependency'
   if (id.includes('lollipop')) return 'lollipop'
+  if (id.includes('contains')) return 'contains'
   if (id.includes('cross')) return 'cross'
   if (id.includes('circle')) return 'circle'
-  if (id.includes('point') || id.includes('arrowhead') || id.includes('head')) return 'arrowhead'
+  if (id.includes('point') || id.includes('arrow') || id.includes('head') || id.includes('barb')) return 'arrowhead'
   return 'marker'
 }
 
@@ -68,6 +70,7 @@ const FIXED_MARKER_LABELS: Partial<Record<MarkerKind, string>> = {
   aggregation: 'Aggregation Diamond',
   dependency: 'Dependency Arrow',
   lollipop: 'Lollipop',
+  contains: 'Contains Marker',
   marker: 'Marker',
 }
 

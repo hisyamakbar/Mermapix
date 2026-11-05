@@ -1,0 +1,21 @@
+classDiagram
+  direction LR
+  class List~T~ {
+    +add(T item)$ void
+    +size() int*
+    -T[] items
+  }
+  class Repo["Repository (generic)"] {
+    <<Service>>
+  }
+  class A
+  class B {
+    +int x
+  }
+  A "1" --> "*" B : has
+  List~T~ <|.. Repo
+  A -- B
+  A ()-- Repo
+  A --* B
+  note "A free floating note"
+  click A href "https://example.com"

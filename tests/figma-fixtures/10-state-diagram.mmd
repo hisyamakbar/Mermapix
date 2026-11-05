@@ -1,0 +1,26 @@
+stateDiagram-v2
+  [*] --> Idle
+  Idle --> Active : start
+  state Active {
+    [*] --> Running
+    Running --> Paused : pause
+    Paused --> Running : resume
+    state Inner {
+      [*] --> A
+      A --> [*]
+    }
+    Running --> Inner
+  }
+  state choice_state <<choice>>
+  Active --> choice_state
+  choice_state --> Done : ok
+  choice_state --> Idle : retry
+  state fork_state <<fork>>
+  state join_state <<join>>
+  Done --> fork_state
+  fork_state --> P1
+  fork_state --> P2
+  P1 --> join_state
+  P2 --> join_state
+  join_state --> [*]
+  note right of Idle : Waiting for input

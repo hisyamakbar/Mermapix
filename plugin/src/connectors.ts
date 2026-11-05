@@ -16,6 +16,9 @@ import {
   assignLabelsToEdges,
   edgeBodyFromName,
   edgeDisplayName,
+  isAnonymousEdgeName,
+  resolveEdgeEndpointsByGeometry,
+  type EdgeTarget,
   polylineHitsRect,
   rectsOverlap,
   resolveEdgeEndpoints,
@@ -58,7 +61,8 @@ function collectEdges(root: any): EdgeInfo[] {
       const c = kids[i]
       if (!isLive(c)) continue
       if (c.type === 'VECTOR') {
-        const body = edgeBodyFromName(c.name)
+        // `L_a_b_0` / `id_A_B_1` carry ids; state transitions and note connectors are anonymous ('').
+        const body = edgeBodyFromName(c.name) ?? (isAnonymousEdgeName(c.name) ? '' : null)
         if (body === null) continue
         // The marker groups of this edge follow it directly (svgPrep inlines them after the path).
         const markers: any[] = []
@@ -84,20 +88,30 @@ function collectEdges(root: any): EdgeInfo[] {
   return edges
 }
 
-/** id -> human label for every node frame and cluster frame anywhere below `root`. */
-function collectLabels(root: any): Map<string, string> {
+/** id -> human label (and absolute rect, for geometric edge endpoints) of every node/cluster frame below `root`. */
+function collectLabels(root: any): { labels: Map<string, string>; targets: EdgeTarget[] } {
   const labels = new Map<string, string>()
+  const targets: EdgeTarget[] = []
   const visit = (n: any): void => {
     if (!isLive(n) || !('children' in n)) return
     for (const c of n.children) {
       if (!isLive(c)) continue
-      if (isNodeFrame(c)) labels.set(readData(c, NODE_ID_KEY), c.name && c.name !== 'Shape' ? c.name : readData(c, NODE_ID_KEY))
-      else if (isClusterFrame(c)) labels.set(readData(c, CLUSTER_ID_KEY), readData(c, CLUSTER_LABEL_KEY))
+      if (isNodeFrame(c)) {
+        const id = readData(c, NODE_ID_KEY)
+        const label = readData(c, CLUSTER_LABEL_KEY)
+        labels.set(id, label || (c.name && c.name !== 'Shape' ? c.name : id))
+        targets.push({ id, rect: absRect(c) })
+      } else if (isClusterFrame(c)) {
+        const id = readData(c, CLUSTER_ID_KEY)
+        labels.set(id, readData(c, CLUSTER_LABEL_KEY))
+        // The inner "Body" panel of a composite state is not an edge endpoint, its outer frame is.
+        if (readData(c, 'mermapix:kind') !== 'State Body') targets.push({ id, rect: absRect(c) })
+      }
       if (c.type === 'FRAME' || c.type === 'GROUP') visit(c)
     }
   }
   visit(root)
-  return labels
+  return { labels, targets }
 }
 
 function collectEdgeLabelFrames(root: any): any[] {
@@ -158,7 +172,7 @@ export function arrangeFlowchart(root: any): ConnectorsResult {
   const result: ConnectorsResult = { edges: 0, grouped: 0, labelsInEdges: 0, labelsLoose: 0 }
   if (!isLive(root) || root.type !== 'FRAME') return result
 
-  const labelMap = collectLabels(root)
+  const { labels: labelMap, targets } = collectLabels(root)
   const edges = collectEdges(root)
   const labelFrames = collectEdgeLabelFrames(root)
   const { clusters, nodes } = collectTopLevel(root)
@@ -203,9 +217,11 @@ export function arrangeFlowchart(root: any): ConnectorsResult {
   const edgeGroups: any[] = []
   const known = [...labelMap.keys()]
   edges.forEach((e, i) => {
-    const ends = resolveEdgeEndpoints(e.body, known)
+    const ends = e.body
+      ? resolveEdgeEndpoints(e.body, known)
+      : resolveEdgeEndpointsByGeometry(e.pts, targets)
     const label = (id: string): string => labelMap.get(id) || id
-    const name = ends ? edgeDisplayName(label(ends.from), label(ends.to)) : `Edge: ${e.body}`
+    const name = ends ? edgeDisplayName(label(ends.from), label(ends.to)) : `Edge: ${e.body || 'Connector'}`
     try {
       e.vector.name = 'Line'
     } catch {}

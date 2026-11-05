@@ -300,6 +300,18 @@ export function isEllipseOutline(pts: Pt[], w: number, h: number): boolean {
   return pts.every((p) => Math.abs(Math.hypot((p.x - a) / a, (p.y - b) / b) - 1) <= 0.04)
 }
 
+/** True when the 4 vertices are exactly the corners of the w x h bounds (in any order). */
+export function isBoundsCorners(poly: Pt[], w: number, h: number): boolean {
+  const tol = Math.max(0.5, Math.min(w, h) * 0.01)
+  const corners: Pt[] = [
+    { x: 0, y: 0 },
+    { x: w, y: 0 },
+    { x: w, y: h },
+    { x: 0, y: h },
+  ]
+  return corners.every((c) => poly.some((p) => near(p.x, c.x, tol) && near(p.y, c.y, tol)))
+}
+
 function classifyPolygon(poly: Pt[], w: number, h: number): ShapeKind {
   const tol = Math.max(1, Math.min(w, h) * 0.02)
   const n = poly.length
@@ -359,6 +371,8 @@ export function classifyShape(data: string | null | undefined, width: number, he
         const q = poly[(i + 1) % poly.length]
         return near(p.x, q.x, 0.01) || near(p.y, q.y, 0.01)
       })
+      // Rough/classic rectangles arrive as an OPEN 4-corner polygon (the closing side is implicit in the fill).
+      if (poly.length === 4 && isBoundsCorners(poly, width, height)) return { kind: 'Rectangle', rectLike: true, cornerRadius: 0 }
       if (axisAligned && poly.length > 4) return complex('Subroutine')
       return complex(classifyPolygon(poly, width, height))
     }

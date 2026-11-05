@@ -1,0 +1,35 @@
+classDiagram
+  namespace Shapes {
+    class Shape {
+      <<abstract>>
+      +String name
+      -int id
+      +area() double
+      +draw() void
+    }
+    class Circle {
+      +double radius
+      +area() double
+    }
+  }
+  class Animal {
+    +String name
+    +int age
+    +makeSound() void
+  }
+  class Duck {
+    +swim()
+  }
+  class Pond
+  class Flyer {
+    <<interface>>
+    +fly()
+  }
+  Shape <|-- Circle
+  Animal <|-- Duck
+  Duck --> Pond : lives in
+  Duck ..|> Flyer
+  Pond *-- Duck : contains
+  Animal o-- Pond
+  Animal ..> Flyer : uses
+  note for Duck "Quacks loudly"

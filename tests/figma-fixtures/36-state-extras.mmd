@@ -1,0 +1,17 @@
+stateDiagram-v2
+  direction LR
+  state "A long description" as s1
+  [*] --> s1
+  s1 --> Work
+  state Work {
+    Task1 : Do thing
+    [*] --> Task1
+    --
+    [*] --> Task2
+    Task2 --> [*]
+  }
+  Work --> [*]
+  note left of s1
+    multi
+    line note
+  end note

@@ -346,9 +346,10 @@
 		if (id.includes("aggregation")) return "aggregation";
 		if (id.includes("dependency")) return "dependency";
 		if (id.includes("lollipop")) return "lollipop";
+		if (id.includes("contains")) return "contains";
 		if (id.includes("cross")) return "cross";
 		if (id.includes("circle")) return "circle";
-		if (id.includes("point") || id.includes("arrowhead") || id.includes("head")) return "arrowhead";
+		if (id.includes("point") || id.includes("arrow") || id.includes("head") || id.includes("barb")) return "arrowhead";
 		return "marker";
 	}
 	var MARKER_ID_PREFIX = "inlined-marker";
@@ -364,6 +365,7 @@
 		aggregation: "Aggregation Diamond",
 		dependency: "Dependency Arrow",
 		lollipop: "Lollipop",
+		contains: "Contains Marker",
 		marker: "Marker"
 	};
 	var POSITIONED_MARKER_LABELS = {
@@ -848,6 +850,9 @@
 			const headerHeight = origEntityHeight - cellHeight * parsedRows.length;
 			const tableCard = figma.createFrame();
 			tableCard.name = tableName;
+			try {
+				tableCard.setPluginData("mermapix:kind", "ERD Table");
+			} catch (_unused5) {}
 			tableCard.x = tableX;
 			tableCard.y = tableY;
 			tableCard.layoutMode = "VERTICAL";
@@ -896,10 +901,10 @@
 						style: "Bold"
 					};
 					ht.fontSize = 13;
-				} catch (_unused5) {}
+				} catch (_unused6) {}
 				try {
 					ht.visible = true;
-				} catch (_unused6) {}
+				} catch (_unused7) {}
 				headerFrame.appendChild(ht);
 				adoptedTextIds.add(ht.id);
 			}
@@ -1012,7 +1017,7 @@
 							row.typeText.name = row.typeName;
 							try {
 								row.typeText.visible = true;
-							} catch (_unused7) {}
+							} catch (_unused8) {}
 							cell.appendChild(row.typeText);
 							adoptedTextIds.add(row.typeText.id);
 						}
@@ -1023,7 +1028,7 @@
 							row.nameText.name = row.fieldName;
 							try {
 								row.nameText.visible = true;
-							} catch (_unused8) {}
+							} catch (_unused9) {}
 							cell.appendChild(row.nameText);
 							adoptedTextIds.add(row.nameText.id);
 						}
@@ -1034,7 +1039,7 @@
 							badgeText.name = badgeText.characters.trim();
 							try {
 								badgeText.visible = true;
-							} catch (_unused9) {}
+							} catch (_unused10) {}
 							cell.appendChild(badgeText);
 							adoptedTextIds.add(badgeText.id);
 						}
@@ -1045,7 +1050,7 @@
 							ct.name = ct.characters.trim();
 							try {
 								ct.visible = true;
-							} catch (_unused10) {}
+							} catch (_unused11) {}
 							cell.appendChild(ct);
 							adoptedTextIds.add(ct.id);
 						}
@@ -1083,7 +1088,7 @@
 				parent.appendChild(tableCard);
 				try {
 					entity.remove();
-				} catch (_unused11) {}
+				} catch (_unused12) {}
 			}
 		}
 	}
@@ -1353,6 +1358,28 @@
 		if (a < 1 || b < 1) return false;
 		return pts.every((p) => Math.abs(Math.hypot((p.x - a) / a, (p.y - b) / b) - 1) <= .04);
 	}
+	/** True when the 4 vertices are exactly the corners of the w x h bounds (in any order). */
+	function isBoundsCorners(poly, w, h) {
+		const tol = Math.max(.5, Math.min(w, h) * .01);
+		return [
+			{
+				x: 0,
+				y: 0
+			},
+			{
+				x: w,
+				y: 0
+			},
+			{
+				x: w,
+				y: h
+			},
+			{
+				x: 0,
+				y: h
+			}
+		].every((c) => poly.some((p) => near(p.x, c.x, tol) && near(p.y, c.y, tol)));
+	}
 	function classifyPolygon(poly, w, h) {
 		const tol = Math.max(1, Math.min(w, h) * .02);
 		const n = poly.length;
@@ -1430,10 +1457,16 @@
 			const polys = polygonVertices(cmds);
 			if (polys.length === 1) {
 				const poly = polys[0];
-				if (poly.every((p, i) => {
+				const axisAligned = poly.every((p, i) => {
 					const q = poly[(i + 1) % poly.length];
 					return near(p.x, q.x, .01) || near(p.y, q.y, .01);
-				}) && poly.length > 4) return complex("Subroutine");
+				});
+				if (poly.length === 4 && isBoundsCorners(poly, width, height)) return {
+					kind: "Rectangle",
+					rectLike: true,
+					cornerRadius: 0
+				};
+				if (axisAligned && poly.length > 4) return complex("Subroutine");
 				return complex(classifyPolygon(poly, width, height));
 			}
 			return complex(polys.length > 1 && polys.every((p) => p.length === 4) ? "Subroutine" : "Shape");
@@ -1530,7 +1563,7 @@
 	}
 	//#endregion
 	//#region plugin/src/shapes.ts
-	var isLive$3 = (n) => Boolean(n) && !n.removed;
+	var isLive$6 = (n) => Boolean(n) && !n.removed;
 	var hasFill = (v) => Array.isArray(v.fills) && v.fills.length > 0 && v.fills[0].visible !== false && v.fills[0].opacity !== 0;
 	var hasStroke = (v) => Array.isArray(v.strokes) && v.strokes.length > 0 && v.strokes[0].visible !== false && v.strokes[0].opacity !== 0 && Number(v.strokeWeight) > 0;
 	/** Origin of the coordinate space children of `parent` live in (GROUPs are transparent). */
@@ -1569,9 +1602,9 @@
 			others: []
 		};
 		const visit = (n) => {
-			if (!isLive$3(n) || !("children" in n)) return;
+			if (!isLive$6(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$3(c)) continue;
+				if (!isLive$6(c)) continue;
 				if (c.type === "VECTOR") out.vectors.push(c);
 				else if (c.type === "TEXT") {
 					if ((c.characters || "").trim().length > 0) out.texts.push(c);
@@ -1603,31 +1636,40 @@
 	*/
 	function styleShapeText(t) {
 		const style = interStyleForWeight(typeof t.fontWeight === "number" ? t.fontWeight : t.fontName && /bold/i.test(t.fontName.style || "") ? 700 : 400);
+		const italic = Boolean(t.fontName && /italic/i.test(t.fontName.style || ""));
+		const italicStyle = style === "Regular" ? "Italic" : `${style} Italic`;
 		try {
 			t.fontName = {
 				family: "Inter",
-				style
+				style: italic ? italicStyle : style
 			};
 		} catch (_unused2) {
 			try {
 				t.fontName = {
 					family: "Inter",
-					style: "Regular"
+					style
 				};
-			} catch (_unused3) {}
+			} catch (_unused3) {
+				try {
+					t.fontName = {
+						family: "Inter",
+						style: "Regular"
+					};
+				} catch (_unused4) {}
+			}
 		}
 		try {
 			t.textAlignHorizontal = "CENTER";
-		} catch (_unused4) {}
-		try {
-			t.textAlignVertical = "CENTER";
 		} catch (_unused5) {}
 		try {
-			t.textAutoResize = "WIDTH_AND_HEIGHT";
+			t.textAlignVertical = "CENTER";
 		} catch (_unused6) {}
 		try {
-			t.visible = true;
+			t.textAutoResize = "WIDTH_AND_HEIGHT";
 		} catch (_unused7) {}
+		try {
+			t.visible = true;
+		} catch (_unused8) {}
 		const label = (t.characters || "").trim().replace(/\s+/g, " ");
 		t.name = label.length > 28 ? label.slice(0, 28) + "..." : label;
 	}
@@ -1662,7 +1704,7 @@
 	function tag(frame, key, value) {
 		if (value && typeof frame.setPluginData === "function") try {
 			frame.setPluginData(key, value);
-		} catch (_unused8) {}
+		} catch (_unused9) {}
 	}
 	/** Replaces `vector` + `text` (pill / badge style) by one Auto Layout frame carrying the vector's paint. */
 	function convertVectorWithLabel(vector, text, name, cls, extraTag) {
@@ -1690,11 +1732,48 @@
 		return frame;
 	}
 	/**
+	* Replaces a stack of identical-bounds vectors (fill path + outline path, Phase 8.5) by ONE fixed-size
+	* frame carrying the merged fill + stroke + dash + corner radius. The frame is inserted into
+	* `parentNode` at `index` (default: where the first vector was). Returns the frame; the vectors are removed.
+	*/
+	function paintFrameFromVectors(vectors, cls, name, parentNode, index) {
+		const v0 = vectors[0];
+		const parent = parentNode || v0.parent;
+		const at = index !== void 0 ? index : parent.children.indexOf(v0);
+		const merge = mergePaints(vectors.map((vec) => ({
+			hasFill: hasFill(vec),
+			hasStroke: hasStroke(vec),
+			strokeWeight: Number(vec.strokeWeight) || 0,
+			dashPattern: Array.isArray(vec.dashPattern) ? vec.dashPattern : []
+		})));
+		const frame = createCenteredFrame({
+			name,
+			x: 0,
+			y: 0,
+			width: v0.width,
+			height: v0.height
+		});
+		parent.insertChild(Math.max(0, Math.min(at, parent.children.length)), frame);
+		const pos = rebase(v0.x, v0.y, v0.parent, parent);
+		frame.x = pos.x;
+		frame.y = pos.y;
+		const fillSrc = merge.fillFrom >= 0 ? vectors[merge.fillFrom] : null;
+		const strokeSrc = merge.strokeFrom >= 0 ? vectors[merge.strokeFrom] : null;
+		frame.fills = fillSrc ? cloneAll(fillSrc.fills) : [];
+		if (strokeSrc) applyStroke(frame, strokeSrc, merge.dash);
+		frame.cornerRadius = cls.cornerRadius;
+		for (const v of vectors) if (isLive$6(v)) try {
+			v.remove();
+		} catch (_unused10) {}
+		tag(frame, "mermapix:kind", cls.kind);
+		return frame;
+	}
+	/**
 	* Converts one Mermaid node group (shape vector(s) + label text) into a native frame.
 	* Returns null (group untouched) when it has no vector, or contains unknown node types.
 	*/
 	function convertShapeGroup(group, opts = {}) {
-		if (!isLive$3(group) || !group.parent || !("children" in group)) return null;
+		if (!isLive$6(group) || !group.parent || !("children" in group)) return null;
 		const parts = collectParts(group);
 		if (parts.vectors.length === 0 || parts.others.length > 0) return null;
 		const visuals = groupStackedBounds(parts.vectors).map((vs) => ({
@@ -1781,7 +1860,7 @@
 			frame.appendChild(vec);
 			try {
 				vec.layoutPositioning = "ABSOLUTE";
-			} catch (_unused9) {}
+			} catch (_unused11) {}
 			vec.x = visual.x - bx;
 			vec.y = visual.y - by;
 			try {
@@ -1789,7 +1868,7 @@
 					horizontal: "SCALE",
 					vertical: "SCALE"
 				};
-			} catch (_unused10) {}
+			} catch (_unused12) {}
 			vec.name = cls.kind;
 		}
 		let textWidth = 0;
@@ -1804,17 +1883,17 @@
 			frame.appendChild(t);
 			try {
 				t.layoutPositioning = "ABSOLUTE";
-			} catch (_unused11) {}
+			} catch (_unused13) {}
 			t.x = rx;
 			t.y = ry;
 			textWidth = Math.max(textWidth, t.width);
 		}
-		for (const v of parts.vectors) if (isLive$3(v) && v.parent !== frame) try {
+		for (const v of parts.vectors) if (isLive$6(v) && v.parent !== frame) try {
 			v.remove();
-		} catch (_unused12) {}
+		} catch (_unused14) {}
 		try {
 			group.remove();
-		} catch (_unused13) {}
+		} catch (_unused15) {}
 		tag(frame, "mermapix:kind", cls.kind);
 		tag(frame, "mermapix:node", opts.nodeId);
 		return {
@@ -1888,12 +1967,56 @@
 		return best;
 	}
 	var EDGE_NAME_RE = /(?:^|-)L_(.+)_(\d+)$/;
+	/** classDiagram relations: `<svgId>-id_<from>_<to>_<n>` (ERD `id_entity-…` edges are not matched). */
+	var CLASS_EDGE_NAME_RE = /(?:^|-)id_(.+)_(\d+)$/;
+	/** stateDiagram transitions (`edge<n>`) and note/class-note connectors carry no ids at all. */
+	var ANON_EDGE_NAME_RE = /(?:^|-)(?:edge|edgeNote)\d+$|----note-\d+(?:-.*)?$/;
 	/** Mermaid edge layer names look like `<svgId>-L_<from>_<to>_<n>`. Returns `<from>_<to>` or null. */
 	function edgeBodyFromName(name) {
 		if (!name || typeof name !== "string") return null;
 		if (name.includes("inlined-marker")) return null;
 		const m = EDGE_NAME_RE.exec(name);
-		return m ? m[1] : null;
+		if (m) return m[1];
+		if (!name.includes("entity-")) {
+			const c = CLASS_EDGE_NAME_RE.exec(name);
+			if (c) return c[1];
+		}
+		return null;
+	}
+	/** True for connector layer names without from/to ids (state transitions, note connectors). */
+	function isAnonymousEdgeName(name) {
+		if (!name || typeof name !== "string" || name.includes("inlined-marker")) return false;
+		return ANON_EDGE_NAME_RE.test(name);
+	}
+	/** Distance from a point to the OUTLINE of a rect (0 on the border, grows inside and outside). */
+	function distanceToRectOutline(p, r) {
+		const dx = Math.max(r.x - p.x, 0, p.x - (r.x + r.width));
+		const dy = Math.max(r.y - p.y, 0, p.y - (r.y + r.height));
+		if (dx > 0 || dy > 0) return Math.hypot(dx, dy);
+		return Math.min(p.x - r.x, r.x + r.width - p.x, p.y - r.y, r.y + r.height - p.y);
+	}
+	/** The target whose outline is nearest to `p` within `maxDist`, preferring the smaller rect on ties. */
+	function nearestTarget(p, targets, maxDist = 24) {
+		let best = null;
+		let bestD = Infinity;
+		for (const t of targets) {
+			const d = distanceToRectOutline(p, t.rect);
+			if (d < bestD - .01 || Math.abs(d - bestD) <= .01 && best && rectArea(t.rect) < rectArea(best.rect)) {
+				best = t;
+				bestD = d;
+			}
+		}
+		return best && bestD <= maxDist ? best : null;
+	}
+	/** from = the target at the start of the polyline, to = the target at its end (null when either is unknown). */
+	function resolveEdgeEndpointsByGeometry(pts, targets, maxDist = 24) {
+		if (pts.length < 2) return null;
+		const a = nearestTarget(pts[0], targets, maxDist);
+		const b = nearestTarget(pts[pts.length - 1], targets, maxDist);
+		return a && b ? {
+			from: a.id,
+			to: b.id
+		} : null;
 	}
 	/**
 	* Splits `<from>_<to>` into the two ids. Node ids may contain underscores, so every split is
@@ -1993,16 +2116,16 @@
 	var CLUSTER_ID_KEY = "mermapix:cluster";
 	var CLUSTER_LABEL_KEY = "mermapix:label";
 	var NODE_ID_KEY = "mermapix:node";
-	var isLive$2 = (n) => Boolean(n) && !n.removed;
-	var readData$1 = (n, key) => {
+	var isLive$5 = (n) => Boolean(n) && !n.removed;
+	var readData$2 = (n, key) => {
 		try {
 			return typeof n.getPluginData === "function" ? n.getPluginData(key) || "" : "";
 		} catch (_unused) {
 			return "";
 		}
 	};
-	var isNodeFrame = (n) => n && n.type === "FRAME" && readData$1(n, "mermapix:node") !== "";
-	var isClusterFrame = (n) => n && n.type === "FRAME" && readData$1(n, "mermapix:cluster") !== "";
+	var isNodeFrame = (n) => n && n.type === "FRAME" && readData$2(n, "mermapix:node") !== "";
+	var isClusterFrame = (n) => n && n.type === "FRAME" && readData$2(n, "mermapix:cluster") !== "";
 	/** Absolute bounds of `n` in root-frame coordinates (GROUPs are coordinate-transparent). */
 	function absRect(n) {
 		const o = childOrigin(n.parent);
@@ -2017,9 +2140,9 @@
 	function findClusterGroups(root) {
 		const out = [];
 		const visit = (n) => {
-			if (!isLive$2(n) || !("children" in n)) return;
+			if (!isLive$5(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$2(c) || c.type !== "GROUP") continue;
+				if (!isLive$5(c) || c.type !== "GROUP") continue;
 				const id = clusterIdFromName(c.name);
 				if (id !== null) {
 					const parts = collectParts(c);
@@ -2040,14 +2163,19 @@
 		visit(root);
 		return out;
 	}
-	function convertClusterGroup(cg) {
+	var SUBGRAPH_NAMING = {
+		prefix: "Subgraph",
+		kind: "Subgraph"
+	};
+	/** Converts one cluster group (single rect vector + title text) into a container frame (exported for 8.5 steps). */
+	function convertClusterGroup(cg, naming = SUBGRAPH_NAMING) {
 		const { group, vector: v, texts } = cg;
 		const parentNode = group.parent;
 		const index = parentNode.children.indexOf(group);
 		const title = labelOf(texts);
 		const cls = classifyShape(pathDataOf(v), v.width, v.height);
 		const frame = figma.createFrame();
-		frame.name = `Subgraph: ${title || cg.id}`;
+		frame.name = `${naming.prefix}: ${title || cg.id}`;
 		frame.layoutMode = "NONE";
 		frame.resize(v.width, v.height);
 		parentNode.insertChild(index, frame);
@@ -2081,7 +2209,7 @@
 		} catch (_unused3) {}
 		tag(frame, CLUSTER_ID_KEY, cg.id);
 		tag(frame, CLUSTER_LABEL_KEY, title || cg.id);
-		tag(frame, "mermapix:kind", "Subgraph");
+		tag(frame, "mermapix:kind", naming.kind);
 		return {
 			frame,
 			id: cg.id,
@@ -2089,16 +2217,16 @@
 		};
 	}
 	/** Converts every cluster group below `root` into a native frame (document order kept). */
-	function convertClusters(root) {
-		return findClusterGroups(root).map(convertClusterGroup);
+	function convertClusters(root, naming = SUBGRAPH_NAMING) {
+		return findClusterGroups(root).map((cg) => convertClusterGroup(cg, naming));
 	}
 	/** Node + cluster frames below `root`, in document (z) order, descending through GROUPs only. */
 	function collectItems(root) {
 		const items = [];
 		const visit = (n) => {
-			if (!isLive$2(n) || !("children" in n)) return;
+			if (!isLive$5(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$2(c)) continue;
+				if (!isLive$5(c)) continue;
 				if (isClusterFrame(c) || isNodeFrame(c)) items.push({
 					node: c,
 					rect: absRect(c),
@@ -2142,7 +2270,7 @@
 			return d;
 		};
 		const moved = /* @__PURE__ */ new Map();
-		const idOf = (it) => readData$1(it.node, it.isCluster ? CLUSTER_ID_KEY : NODE_ID_KEY);
+		const idOf = (it) => readData$2(it.node, it.isCluster ? CLUSTER_ID_KEY : NODE_ID_KEY);
 		const place = (it) => {
 			const parent = parentOf.get(it);
 			if (!parent) return;
@@ -2159,31 +2287,32 @@
 	}
 	//#endregion
 	//#region plugin/src/connectors.ts
-	var isLive$1 = (n) => Boolean(n) && !n.removed;
-	var readData = (n, key) => {
+	var isLive$4 = (n) => Boolean(n) && !n.removed;
+	var readData$1 = (n, key) => {
 		try {
 			return typeof n.getPluginData === "function" ? n.getPluginData(key) || "" : "";
 		} catch (_unused) {
 			return "";
 		}
 	};
-	var isEdgeLabelFrame = (n) => Boolean(n) && n.type === "FRAME" && readData(n, "mermapix:kind") === "Edge Label";
+	var isEdgeLabelFrame = (n) => Boolean(n) && n.type === "FRAME" && readData$1(n, "mermapix:kind") === "Edge Label";
 	/** Edge vectors (`…L_<from>_<to>_<n>`) below `root`, descending through transparent GROUPs only. */
 	function collectEdges(root) {
 		const edges = [];
 		const visit = (n) => {
-			if (!isLive$1(n) || !("children" in n)) return;
+			if (!isLive$4(n) || !("children" in n)) return;
 			const kids = [...n.children];
 			for (let i = 0; i < kids.length; i++) {
 				const c = kids[i];
-				if (!isLive$1(c)) continue;
+				if (!isLive$4(c)) continue;
 				if (c.type === "VECTOR") {
-					const body = edgeBodyFromName(c.name);
+					var _edgeBodyFromName;
+					const body = (_edgeBodyFromName = edgeBodyFromName(c.name)) !== null && _edgeBodyFromName !== void 0 ? _edgeBodyFromName : isAnonymousEdgeName(c.name) ? "" : null;
 					if (body === null) continue;
 					const markers = [];
 					for (let j = i + 1; j < kids.length; j++) {
 						const m = kids[j];
-						if (isLive$1(m) && m.type === "GROUP" && String(m.name || "").includes("inlined-marker")) markers.push(m);
+						if (isLive$4(m) && m.type === "GROUP" && String(m.name || "").includes("inlined-marker")) markers.push(m);
 						else break;
 					}
 					const a = absRect(c);
@@ -2202,27 +2331,45 @@
 		visit(root);
 		return edges;
 	}
-	/** id -> human label for every node frame and cluster frame anywhere below `root`. */
+	/** id -> human label (and absolute rect, for geometric edge endpoints) of every node/cluster frame below `root`. */
 	function collectLabels(root) {
 		const labels = /* @__PURE__ */ new Map();
+		const targets = [];
 		const visit = (n) => {
-			if (!isLive$1(n) || !("children" in n)) return;
+			if (!isLive$4(n) || !("children" in n)) return;
 			for (const c of n.children) {
-				if (!isLive$1(c)) continue;
-				if (isNodeFrame(c)) labels.set(readData(c, NODE_ID_KEY), c.name && c.name !== "Shape" ? c.name : readData(c, NODE_ID_KEY));
-				else if (isClusterFrame(c)) labels.set(readData(c, CLUSTER_ID_KEY), readData(c, CLUSTER_LABEL_KEY));
+				if (!isLive$4(c)) continue;
+				if (isNodeFrame(c)) {
+					const id = readData$1(c, NODE_ID_KEY);
+					const label = readData$1(c, CLUSTER_LABEL_KEY);
+					labels.set(id, label || (c.name && c.name !== "Shape" ? c.name : id));
+					targets.push({
+						id,
+						rect: absRect(c)
+					});
+				} else if (isClusterFrame(c)) {
+					const id = readData$1(c, CLUSTER_ID_KEY);
+					labels.set(id, readData$1(c, CLUSTER_LABEL_KEY));
+					if (readData$1(c, "mermapix:kind") !== "State Body") targets.push({
+						id,
+						rect: absRect(c)
+					});
+				}
 				if (c.type === "FRAME" || c.type === "GROUP") visit(c);
 			}
 		};
 		visit(root);
-		return labels;
+		return {
+			labels,
+			targets
+		};
 	}
 	function collectEdgeLabelFrames(root) {
 		const out = [];
 		const visit = (n) => {
-			if (!isLive$1(n) || !("children" in n)) return;
+			if (!isLive$4(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$1(c)) continue;
+				if (!isLive$4(c)) continue;
 				if (isEdgeLabelFrame(c)) out.push(c);
 				else if (c.type === "GROUP" && !String(c.name || "").includes("inlined-marker")) visit(c);
 			}
@@ -2235,9 +2382,9 @@
 		const clusters = [];
 		const nodes = [];
 		const visit = (n) => {
-			if (!isLive$1(n) || !("children" in n)) return;
+			if (!isLive$4(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$1(c)) continue;
+				if (!isLive$4(c)) continue;
 				if (isClusterFrame(c)) clusters.push(c);
 				else if (isNodeFrame(c)) nodes.push(c);
 				else if (c.type === "GROUP") visit(c);
@@ -2250,7 +2397,7 @@
 		};
 	}
 	function makeGroup$1(members, parent, name) {
-		const live = members.filter(isLive$1);
+		const live = members.filter(isLive$4);
 		if (live.length === 0) return null;
 		try {
 			const g = figma.group(live, parent);
@@ -2271,8 +2418,8 @@
 			labelsInEdges: 0,
 			labelsLoose: 0
 		};
-		if (!isLive$1(root) || root.type !== "FRAME") return result;
-		const labelMap = collectLabels(root);
+		if (!isLive$4(root) || root.type !== "FRAME") return result;
+		const { labels: labelMap, targets } = collectLabels(root);
 		const edges = collectEdges(root);
 		const labelFrames = collectEdgeLabelFrames(root);
 		const { clusters, nodes } = collectTopLevel(root);
@@ -2303,9 +2450,9 @@
 		const edgeGroups = [];
 		const known = [...labelMap.keys()];
 		edges.forEach((e, i) => {
-			const ends = resolveEdgeEndpoints(e.body, known);
+			const ends = e.body ? resolveEdgeEndpoints(e.body, known) : resolveEdgeEndpointsByGeometry(e.pts, targets);
 			const label = (id) => labelMap.get(id) || id;
-			const name = ends ? edgeDisplayName(label(ends.from), label(ends.to)) : `Edge: ${e.body}`;
+			const name = ends ? edgeDisplayName(label(ends.from), label(ends.to)) : `Edge: ${e.body || "Connector"}`;
 			try {
 				e.vector.name = "Line";
 			} catch (_unused3) {}
@@ -2511,14 +2658,14 @@
 	}
 	//#endregion
 	//#region plugin/src/sequence.ts
-	var isLive = (n) => Boolean(n) && !n.removed;
+	var isLive$3 = (n) => Boolean(n) && !n.removed;
 	var isMarkerGroup = (n) => n.type === "GROUP" && String(n.name || "").includes("inlined-marker");
 	var clip = (s, max) => s.length > max ? s.slice(0, max - 1) + "…" : s;
 	var SEQ_KIND_KEY = "mermapix:kind";
 	var isStrokeLine = (v) => hasStroke(v) && !hasFill(v) && (v.width < .01 || v.height < .01) && (v.width > .01 || v.height > .01);
 	function hasMarkerDescendant(g) {
 		for (const c of g.children || []) {
-			if (!isLive(c)) continue;
+			if (!isLive$3(c)) continue;
 			if (isMarkerGroup(c)) return true;
 			if (c.type === "GROUP" && hasMarkerDescendant(c)) return true;
 		}
@@ -2556,7 +2703,7 @@
 	/** All pieces below `parent` in z-order; recognized groups are taken whole, other groups are entered. */
 	function walk(parent, out) {
 		for (const c of [...parent.children || []]) {
-			if (!isLive(c)) continue;
+			if (!isLive$3(c)) continue;
 			if (c.type === "GROUP") {
 				if (isMarkerGroup(c)) {
 					out.push({
@@ -2596,7 +2743,7 @@
 		t.y = cy - t.height / 2 - o.y;
 	}
 	function removeIfEmptyGroup(g) {
-		if (isLive(g) && g.type === "GROUP" && Array.isArray(g.children) && g.children.length === 0) try {
+		if (isLive$3(g) && g.type === "GROUP" && Array.isArray(g.children) && g.children.length === 0) try {
 			g.remove();
 		} catch (_unused) {}
 	}
@@ -2624,7 +2771,7 @@
 		return f;
 	}
 	function makeGroup(members, parent, name) {
-		const live = members.filter(isLive);
+		const live = members.filter(isLive$3);
 		if (live.length === 0) return null;
 		try {
 			const g = figma.group(live, parent);
@@ -2866,7 +3013,7 @@
 			highlights: 0,
 			messages: 0
 		};
-		if (!isLive(root) || root.type !== "FRAME" || !Array.isArray(root.children)) return result;
+		if (!isLive$3(root) || root.type !== "FRAME" || !Array.isArray(root.children)) return result;
 		const entries = [];
 		walk(root, entries);
 		const lifelines = entries.filter((e) => e.kind === "leaf" && e.node.type === "VECTOR" && isLifelineName(e.node.name) && e.node.width < .01 && e.node.height > 1).map((e) => ({
@@ -2960,7 +3107,7 @@
 			const i = nearestIndex(x, participantNames.map((p) => p.cx), tol);
 			return i >= 0 ? participantNames[i].name : "";
 		};
-		const looseTexts = entries.filter((e) => e.kind === "leaf" && e.node.type === "TEXT" && isLive(e.node)).map((e) => ({
+		const looseTexts = entries.filter((e) => e.kind === "leaf" && e.node.type === "TEXT" && isLive$3(e.node)).map((e) => ({
 			node: e.node,
 			r: absRect(e.node)
 		}));
@@ -3015,7 +3162,7 @@
 			blocks.push(b);
 			result.blocks++;
 		}
-		const raw = parseMessages(entries.filter((e) => e.kind === "leaf" && !consumed.has(e.node) && isLive(e.node)).map((e) => e.node));
+		const raw = parseMessages(entries.filter((e) => e.kind === "leaf" && !consumed.has(e.node) && isLive$3(e.node)).map((e) => e.node));
 		const messages = [];
 		const xs = lifelines.map((l) => l.cx);
 		raw.forEach((m, i) => {
@@ -3154,10 +3301,10 @@
 				items: topMessages
 			}
 		];
-		const leftovers = [...root.children].filter((c) => isLive(c));
+		const leftovers = [...root.children].filter((c) => isLive$3(c));
 		for (const s of strata) for (const it of s.items) placed.add(it.node);
 		for (const s of strata) {
-			const nodes = s.items.map((it) => it.node).filter(isLive);
+			const nodes = s.items.map((it) => it.node).filter(isLive$3);
 			if (nodes.length === 0) continue;
 			for (const n of nodes) if (n.parent !== root) moveKeepingAbs(n, root, absRect(n));
 			else root.appendChild(n);
@@ -3167,7 +3314,7 @@
 			}
 		}
 		for (const c of leftovers) {
-			if (!isLive(c) || placed.has(c)) continue;
+			if (!isLive$3(c) || placed.has(c)) continue;
 			if (c.type === "GROUP" && Array.isArray(c.children) && c.children.length === 0) {
 				try {
 					c.remove();
@@ -3178,6 +3325,848 @@
 		}
 		result.converted = true;
 		return result;
+	}
+	//#endregion
+	//#region plugin/src/classGeometry.ts
+	/** Mermaid class box groups are named `<svgId>-classId-<id>-<n>`. Returns the class id or null. */
+	function classIdFromName(name) {
+		if (!name || typeof name !== "string" || name.includes("inlined-marker")) return null;
+		const m = /-classId-(.+)-(\d+)$/.exec(name);
+		return m ? m[1] : null;
+	}
+	/** Mermaid `note for X "…"` groups are named `<svgId>-note<n>`. Returns the note id (`note0`) or null. */
+	function classNoteIdFromName(name) {
+		if (!name || typeof name !== "string" || name.includes("inlined-marker")) return null;
+		const m = /-(note\d+)$/.exec(name);
+		return m ? m[1] : null;
+	}
+	/** Lollipop interface nodes (`A ()-- B`) are groups named `<svgId>-interface<n>`. */
+	function classInterfaceIdFromName(name) {
+		if (!name || typeof name !== "string" || name.includes("inlined-marker")) return null;
+		const m = /-(interface\d+)$/.exec(name);
+		return m ? m[1] : null;
+	}
+	/** `«interface»` / `<<interface>>` annotation line of a class header. */
+	function isAnnotationText(s) {
+		const t = (s || "").trim();
+		return /^«.+»$/.test(t) || /^<<.+>>$/.test(t);
+	}
+	/**
+	* Splits a box [boxTop, boxBottom] by its divider strokes into compartments that tile it exactly:
+	* a divider belongs to the compartment ABOVE it, as an inside-bottom border of its own weight
+	* (it spans [y - weight/2, y + weight/2], like the original centered stroke). The sum of all
+	* heights is boxBottom - boxTop, so a vertical Auto Layout parent of this height needs no slack.
+	*/
+	function splitCompartments(boxTop, boxBottom, dividers) {
+		const ds = dividers.slice().sort((a, b) => a.y - b.y);
+		const spans = [];
+		let top = boxTop;
+		for (const d of ds) {
+			const bottom = Math.min(boxBottom, Math.max(top, d.y + d.weight / 2));
+			spans.push({
+				top,
+				bottom
+			});
+			top = bottom;
+		}
+		spans.push({
+			top,
+			bottom: boxBottom
+		});
+		return spans;
+	}
+	/** Compartment index of a vertical position: the first span whose bottom is below `y`. */
+	function compartmentIndex(spans, y) {
+		for (let i = 0; i < spans.length; i++) if (y < spans[i].bottom) return i;
+		return spans.length - 1;
+	}
+	function compartmentName(index, count) {
+		if (index === 0) return "Header";
+		if (count === 3) return index === 1 ? "Attributes" : "Methods";
+		if (count === 2) return "Members";
+		return `Section ${index}`;
+	}
+	/**
+	* Vertical Auto Layout needs top padding + item spacing to put a stack of auto-height items exactly
+	* where Mermaid had them: item i is centered on `centers[i]` and is `heights[i]` tall in the new font.
+	* Spacing is the mean gap between consecutive items (never negative).
+	*/
+	function stackPadding(centers, heights, spanTop) {
+		if (centers.length === 0) return {
+			paddingTop: 0,
+			itemSpacing: 0
+		};
+		const round = (v) => Math.round(v * 100) / 100;
+		const paddingTop = Math.max(0, round(centers[0] - heights[0] / 2 - spanTop));
+		if (centers.length === 1) return {
+			paddingTop,
+			itemSpacing: 0
+		};
+		let gaps = 0;
+		for (let i = 0; i + 1 < centers.length; i++) gaps += centers[i + 1] - centers[i] - (heights[i] + heights[i + 1]) / 2;
+		return {
+			paddingTop,
+			itemSpacing: Math.max(0, round(gaps / (centers.length - 1)))
+		};
+	}
+	/**
+	* Horizontal padding that keeps content centered on `contentCenter` inside a box of `boxX..boxX+width`
+	* when the Auto Layout centers it: padL - padR = 2 * offset (offset from the box center).
+	*/
+	function centerPadding(contentCenter, boxX, width) {
+		const delta = contentCenter - (boxX + width / 2);
+		if (!Number.isFinite(delta) || Math.abs(delta) < .25) return {
+			left: 0,
+			right: 0
+		};
+		const v = Math.round(Math.abs(delta) * 2 * 100) / 100;
+		return delta > 0 ? {
+			left: v,
+			right: 0
+		} : {
+			left: 0,
+			right: v
+		};
+	}
+	//#endregion
+	//#region plugin/src/class.ts
+	var isLive$2 = (n) => Boolean(n) && !n.removed;
+	function findGroups(root, idOf) {
+		const out = [];
+		const visit = (n) => {
+			if (!isLive$2(n) || !("children" in n)) return;
+			for (const c of [...n.children]) {
+				if (!isLive$2(c) || c.type !== "GROUP") continue;
+				const id = idOf(c.name);
+				if (id !== null) out.push({
+					group: c,
+					id
+				});
+				else visit(c);
+			}
+		};
+		visit(root);
+		return out;
+	}
+	/** Splits a class group's vectors into the box stack and its horizontal divider strokes, or null when it looks different. */
+	function analyze(vectors) {
+		const stacks = groupStackedBounds(vectors);
+		const area = (s) => s[0].width * s[0].height;
+		const boxStack = stacks.reduce((a, b) => area(b) > area(a) ? b : a);
+		const b = boxStack[0];
+		if (b.width < 2 || b.height < 2) return null;
+		const dividers = [];
+		for (const s of stacks) {
+			if (s === boxStack) continue;
+			const v = s[0];
+			const horizontal = v.height <= 1.5 && v.width >= b.width * .9;
+			const inside = v.y >= b.y - 1 && v.y <= b.y + b.height + 1;
+			if (!horizontal || !inside || s.length !== 1) return null;
+			dividers.push({
+				y: v.y + v.height / 2,
+				weight: Number(v.strokeWeight) || 1,
+				vec: v
+			});
+		}
+		return {
+			box: {
+				vectors: boxStack,
+				x: b.x,
+				y: b.y,
+				width: b.width,
+				height: b.height
+			},
+			dividers
+		};
+	}
+	function makeCompartment(name, width, height, centered) {
+		const f = figma.createFrame();
+		f.name = name;
+		f.layoutMode = "VERTICAL";
+		f.primaryAxisSizingMode = "FIXED";
+		f.counterAxisSizingMode = "FIXED";
+		f.primaryAxisAlignItems = "MIN";
+		f.counterAxisAlignItems = centered ? "CENTER" : "MIN";
+		f.itemSpacing = 0;
+		f.paddingLeft = 0;
+		f.paddingRight = 0;
+		f.paddingTop = 0;
+		f.paddingBottom = 0;
+		f.resize(width, Math.max(0, height));
+		f.fills = [];
+		f.strokes = [];
+		f.clipsContent = false;
+		return f;
+	}
+	/** Converts one class group; returns null (group untouched) when its structure is not the expected one. */
+	function convertClassGroup(group, id) {
+		if (!isLive$2(group) || !group.parent) return null;
+		const parts = collectParts(group);
+		if (parts.vectors.length === 0 || parts.others.length > 0) return null;
+		const found = analyze(parts.vectors);
+		if (!found) return null;
+		const { box, dividers } = found;
+		if (!classifyShape(pathDataOf(box.vectors.find(hasFill) || box.vectors[0]), box.width, box.height).rectLike) return null;
+		const spans = splitCompartments(box.y, box.y + box.height, dividers);
+		const buckets = spans.map(() => []);
+		const sorted = [...parts.texts].sort((a, b) => a.y - b.y || a.x - b.x);
+		const geo = /* @__PURE__ */ new Map();
+		for (const t of sorted) {
+			const abs = rebase(t.x, t.y, t.parent, group.parent);
+			geo.set(t, {
+				cx: abs.x + t.width / 2,
+				cy: abs.y + t.height / 2,
+				left: abs.x
+			});
+			buckets[compartmentIndex(spans, abs.y + t.height / 2)].push(t);
+		}
+		const parentNode = group.parent;
+		const index = parentNode.children.indexOf(group);
+		const merge = mergePaints(box.vectors.map((vec) => ({
+			hasFill: hasFill(vec),
+			hasStroke: hasStroke(vec),
+			strokeWeight: Number(vec.strokeWeight) || 0,
+			dashPattern: Array.isArray(vec.dashPattern) ? vec.dashPattern : []
+		})));
+		const fillSrc = merge.fillFrom >= 0 ? box.vectors[merge.fillFrom] : null;
+		const strokeSrc = merge.strokeFrom >= 0 ? box.vectors[merge.strokeFrom] : null;
+		const header = buckets[0];
+		const titleText = header.find((t) => !isAnnotationText(t.characters)) || header[header.length - 1];
+		const title = (titleText ? titleText.characters : id).trim().replace(/\s+/g, " ") || id;
+		const frame = figma.createFrame();
+		frame.name = `Class: ${title}`;
+		frame.layoutMode = "VERTICAL";
+		frame.primaryAxisSizingMode = "FIXED";
+		frame.counterAxisSizingMode = "FIXED";
+		frame.primaryAxisAlignItems = "MIN";
+		frame.counterAxisAlignItems = "MIN";
+		frame.itemSpacing = 0;
+		frame.paddingLeft = 0;
+		frame.paddingRight = 0;
+		frame.paddingTop = 0;
+		frame.paddingBottom = 0;
+		frame.resize(box.width, box.height);
+		parentNode.insertChild(index, frame);
+		const pos = rebase(box.x, box.y, box.vectors[0].parent, parentNode);
+		frame.x = pos.x;
+		frame.y = pos.y;
+		frame.clipsContent = false;
+		frame.fills = fillSrc ? cloneAll(fillSrc.fills) : [];
+		frame.strokes = [];
+		if (strokeSrc) applyStroke(frame, strokeSrc, merge.dash);
+		else if (isRealDash(merge.dash)) frame.dashPattern = merge.dash;
+		frame.cornerRadius = 0;
+		const compartments = [];
+		spans.forEach((span, i) => {
+			const texts = buckets[i];
+			const centered = i === 0;
+			const comp = makeCompartment(compartmentName(i, spans.length), box.width, span.bottom - span.top, centered);
+			frame.appendChild(comp);
+			try {
+				comp.layoutAlign = "STRETCH";
+			} catch (_unused) {}
+			const d = dividers.slice().sort((a, b) => a.y - b.y)[i];
+			if (d && d.vec) {
+				comp.strokes = cloneAll(d.vec.strokes);
+				comp.strokeAlign = "INSIDE";
+				comp.strokeTopWeight = 0;
+				comp.strokeLeftWeight = 0;
+				comp.strokeRightWeight = 0;
+				comp.strokeBottomWeight = d.weight;
+			}
+			const centers = texts.map((t) => geo.get(t).cy);
+			for (const t of texts) {
+				styleShapeText(t);
+				if (!centered) try {
+					t.textAlignHorizontal = "LEFT";
+				} catch (_unused2) {}
+				comp.appendChild(t);
+				if (centered) t.name = isAnnotationText(t.characters) ? `Annotation: ${t.characters.trim()}` : `Title: ${t.characters.trim()}`;
+			}
+			const sp = stackPadding(centers, texts.map((t) => t.height), span.top);
+			comp.paddingTop = Math.min(sp.paddingTop, Math.max(0, comp.height - 1));
+			comp.itemSpacing = sp.itemSpacing;
+			if (texts.length > 0) if (centered) {
+				const cp = centerPadding(texts.reduce((a, t) => a + geo.get(t).cx, 0) / texts.length, box.x, box.width);
+				comp.paddingLeft = cp.left;
+				comp.paddingRight = cp.right;
+			} else {
+				const left = Math.min(...texts.map((t) => geo.get(t).left));
+				comp.paddingLeft = Math.max(0, Math.round((left - box.x) * 100) / 100);
+			}
+			compartments.push(comp);
+		});
+		try {
+			group.remove();
+		} catch (_unused3) {}
+		tag(frame, NODE_ID_KEY, id);
+		tag(frame, CLUSTER_LABEL_KEY, title);
+		tag(frame, "mermapix:kind", "Class");
+		return {
+			frame,
+			id,
+			title,
+			compartments
+		};
+	}
+	/** Converts every class box below `root` into a native frame. */
+	function convertClasses(root) {
+		const out = [];
+		for (const { group, id } of findGroups(root, classIdFromName)) {
+			const res = convertClassGroup(group, id);
+			if (res) out.push(res);
+		}
+		return out;
+	}
+	/** `note for X "…"` boxes -> Auto Layout note frames (`Note: <text>`), tagged so they nest and connect like nodes. */
+	function convertClassNotes(root) {
+		const out = [];
+		for (const { group, id } of findGroups(root, classNoteIdFromName)) {
+			const res = convertShapeGroup(group, { nodeId: id });
+			if (!res) continue;
+			res.frame.name = `Note: ${res.label || id}`;
+			tag(res.frame, CLUSTER_LABEL_KEY, res.label || id);
+			tag(res.frame, "mermapix:kind", "Note");
+			out.push(res.frame);
+		}
+		return out;
+	}
+	/** Lollipop interface nodes (`A ()-- B`): one small rect + the interface name -> `Interface: <name>` frame. */
+	function convertClassInterfaces(root) {
+		const out = [];
+		for (const { group, id } of findGroups(root, classInterfaceIdFromName)) {
+			const res = convertShapeGroup(group, { nodeId: id });
+			if (!res) continue;
+			res.frame.name = `Interface: ${res.label || id}`;
+			tag(res.frame, CLUSTER_LABEL_KEY, res.label || id);
+			tag(res.frame, "mermapix:kind", "Interface");
+			out.push(res.frame);
+		}
+		return out;
+	}
+	//#endregion
+	//#region plugin/src/stateGeometry.ts
+	/** State groups are named `<svgId>-state-<id>-<n>`. */
+	function stateInfoFromName(name) {
+		if (!name || typeof name !== "string" || name.includes("inlined-marker")) return null;
+		const m = /-state-(.+)-(\d+)$/.exec(name);
+		if (!m) return null;
+		const id = m[1];
+		if (id.endsWith("----note")) return {
+			id,
+			role: "note"
+		};
+		if (id.endsWith("----parent")) return {
+			id,
+			role: "parent"
+		};
+		if (/_start$/.test(id)) return {
+			id,
+			role: "start"
+		};
+		if (/_end$/.test(id)) return {
+			id,
+			role: "end"
+		};
+		return {
+			id,
+			role: "node"
+		};
+	}
+	/**
+	* Name of a label-less state shape: a diamond is a choice, a thin bar is a fork or join. Mermaid does
+	* not keep the kind in the SVG, so fork vs join is read from the user's id when it says so.
+	*/
+	function pseudoStateKind(kind, width, height, id) {
+		const long = Math.max(width, height);
+		const short = Math.min(width, height);
+		if (kind === "Diamond") return "Choice";
+		if (short > 0 && long / short >= 3) {
+			if (/join/i.test(id)) return "Join";
+			if (/fork/i.test(id)) return "Fork";
+			return "Fork/Join";
+		}
+		return null;
+	}
+	/** True when `inner` is a smaller box inside `outer` sharing its horizontal extent (a composite state's body panel). */
+	function isCompositePair(outer, inner, tol = 1) {
+		return outer.height > inner.height && inner.height > 10 && Math.abs(outer.x - inner.x) <= tol && Math.abs(outer.width - inner.width) <= tol && inner.y >= outer.y - tol && inner.y + inner.height <= outer.y + outer.height + tol;
+	}
+	//#endregion
+	//#region plugin/src/state.ts
+	var isLive$1 = (n) => Boolean(n) && !n.removed;
+	function findStateGroups(root) {
+		const out = [];
+		const visit = (n) => {
+			if (!isLive$1(n) || !("children" in n)) return;
+			for (const c of [...n.children]) {
+				if (!isLive$1(c) || c.type !== "GROUP") continue;
+				const info = stateInfoFromName(c.name);
+				if (info) out.push({
+					group: c,
+					id: info.id,
+					role: info.role
+				});
+				else visit(c);
+			}
+		};
+		visit(root);
+		return out;
+	}
+	var visible = (v) => hasFill(v) || hasStroke(v);
+	function circleClass(w) {
+		return {
+			kind: "Circle",
+			rectLike: true,
+			cornerRadius: w / 2
+		};
+	}
+	/** `[*]` end state: ring circle + inner dot -> circle frame with a centered inner circle frame. */
+	function convertEnd(group, id) {
+		const parts = collectParts(group);
+		const stacks = groupStackedBounds(parts.vectors);
+		if (stacks.length !== 2 || parts.texts.length > 0 || parts.others.length > 0) return null;
+		const [outer, inner] = stacks[0][0].width >= stacks[1][0].width ? [stacks[0], stacks[1]] : [stacks[1], stacks[0]];
+		const near = (a, b) => Math.abs(a - b) <= .6;
+		if (!near(outer[0].width, outer[0].height) || !near(inner[0].width, inner[0].height)) return null;
+		const parentNode = group.parent;
+		const index = parentNode.children.indexOf(group);
+		const frame = paintFrameFromVectors(outer, circleClass(outer[0].width), "End", parentNode, index);
+		tag(paintFrameFromVectors(inner, circleClass(inner[0].width), "Inner", frame, 0), "mermapix:kind", "End Inner");
+		try {
+			group.remove();
+		} catch (_unused) {}
+		return frame;
+	}
+	function convertStateGroup(group, id, role, results) {
+		const parts = collectParts(group);
+		if (role === "parent") {
+			if (parts.texts.length === 0 && parts.vectors.length > 0 && parts.vectors.every((v) => !visible(v))) try {
+				group.remove();
+			} catch (_unused2) {}
+			return;
+		}
+		if (parts.vectors.length === 0 || parts.others.length > 0) return;
+		if (role === "end") {
+			const f = convertEnd(group, id);
+			if (f) {
+				tag(f, "mermapix:kind", "End");
+				tag(f, NODE_ID_KEY, id);
+				tag(f, CLUSTER_LABEL_KEY, "End");
+				results.pseudo++;
+				return;
+			}
+		}
+		if (role === "note") {
+			const res = convertShapeGroup(group, { nodeId: id });
+			if (!res) return;
+			res.frame.name = `Note: ${res.label || id}`;
+			tag(res.frame, CLUSTER_LABEL_KEY, res.label || id);
+			tag(res.frame, "mermapix:kind", "Note");
+			results.notes++;
+			return;
+		}
+		const stacks = groupStackedBounds(parts.vectors);
+		if (role === "node" && stacks.length === 2 && parts.texts.length >= 1) {
+			const [a, b] = stacks[0][0].height >= stacks[1][0].height ? [stacks[0], stacks[1]] : [stacks[1], stacks[0]];
+			if (isCompositePair(a[0], b[0]) && stacks.every((s) => s.length === 1)) {
+				const outerFill = a[0];
+				const innerBody = b[0];
+				const parentNode = group.parent;
+				const index = parentNode.children.indexOf(group);
+				const body = paintFrameFromVectors([innerBody], {
+					kind: "Rectangle",
+					rectLike: true,
+					cornerRadius: 0
+				}, "Body", parentNode, index);
+				body.layoutMode = "NONE";
+				body.clipsContent = false;
+				tag(body, CLUSTER_ID_KEY, `${id}#body`);
+				tag(body, CLUSTER_LABEL_KEY, id);
+				tag(body, "mermapix:kind", "State Body");
+				convertClusterGroup({
+					group,
+					id,
+					vector: outerFill,
+					texts: parts.texts
+				}, {
+					prefix: "State",
+					kind: "Composite State"
+				});
+				results.composites++;
+				return;
+			}
+		}
+		if (role === "node" && stacks.length === 1 && parts.texts.length === 0) {
+			const v = stacks[0].find(hasFill) || stacks[0][0];
+			const cls = classifyShape(pathDataOf(v), v.width, v.height);
+			if (cls.rectLike && Math.min(v.width, v.height) >= 40 && pseudoStateKind(cls.kind, v.width, v.height, id) === null && stacks[0].every((x) => x.width > 0)) {
+				const parentNode = group.parent;
+				const frame = paintFrameFromVectors(stacks[0], cls, "Region", parentNode, parentNode.children.indexOf(group));
+				frame.layoutMode = "NONE";
+				frame.clipsContent = false;
+				tag(frame, CLUSTER_ID_KEY, id);
+				tag(frame, CLUSTER_LABEL_KEY, "Region");
+				tag(frame, "mermapix:kind", "State Region");
+				try {
+					group.remove();
+				} catch (_unused3) {}
+				results.composites++;
+				return;
+			}
+		}
+		const res = convertShapeGroup(group, { nodeId: id });
+		if (!res) return;
+		const { frame } = res;
+		if (role === "start") {
+			frame.name = "Start";
+			tag(frame, CLUSTER_LABEL_KEY, "Start");
+			tag(frame, "mermapix:kind", "Start");
+			results.pseudo++;
+			return;
+		}
+		if (parts.texts.length === 0) {
+			const pseudo = pseudoStateKind(res.kind, frame.width, frame.height, id);
+			const name = pseudo || "State";
+			frame.name = name;
+			tag(frame, CLUSTER_LABEL_KEY, pseudo ? pseudo === "Choice" ? "Choice" : name : id);
+			tag(frame, "mermapix:kind", pseudo || "State");
+			results.pseudo++;
+			return;
+		}
+		frame.name = `State: ${res.label || id}`;
+		tag(frame, CLUSTER_LABEL_KEY, res.label || id);
+		tag(frame, "mermapix:kind", "State");
+		results.states++;
+	}
+	/** Converts every state group below `root`, then nests states / composites by geometry. */
+	function convertStates(root) {
+		const results = {
+			states: 0,
+			composites: 0,
+			pseudo: 0,
+			notes: 0
+		};
+		for (const { group, id, role } of findStateGroups(root)) {
+			if (!isLive$1(group) || !group.parent) continue;
+			convertStateGroup(group, id, role, results);
+		}
+		if (results.states + results.composites + results.pseudo + results.notes > 0) nestIntoClusters(root);
+		return results;
+	}
+	//#endregion
+	//#region plugin/src/genericGeometry.ts
+	var SKIP_TYPES = /^(er|erdiagram|sequence|class|classdiagram|state|statediagram|flowchart.*)$/i;
+	var MARK_TYPES = new Set([
+		"pie",
+		"gantt",
+		"xychart",
+		"quadrantchart",
+		"sankey",
+		"packet",
+		"treemap",
+		"radar",
+		"venn",
+		"gitgraph",
+		"timeline",
+		"journey"
+	]);
+	var NODE_TYPES = new Set([
+		"block",
+		"c4",
+		"kanban",
+		"architecture",
+		"mindmap",
+		"requirement",
+		"cynefin",
+		"eventmodeling",
+		"wardley",
+		"ishikawa",
+		"treeview"
+	]);
+	function fallbackMode(diagramType) {
+		const t = (diagramType || "").trim().toLowerCase();
+		if (!t) return "names";
+		if (SKIP_TYPES.test(t)) return "skip";
+		if (MARK_TYPES.has(t)) return "marks";
+		if (NODE_TYPES.has(t)) return "nodes";
+		return "names";
+	}
+	/** `aria-roledescription` of the SVG root element (first 4 KB of the markup), or ''. */
+	function diagramTypeFromSvg(svg) {
+		if (!svg || typeof svg !== "string") return "";
+		const head = svg.slice(0, 4096);
+		const m = /<svg\b[^>]*\baria-roledescription="([^"]*)"/.exec(head);
+		return m ? m[1] : "";
+	}
+	/** Layer names the SVG importer / Figma invent: Vector, Group, Frame 12, Rectangle, raw `mermaid-svg-0-…` ids. */
+	function isGenericLayerName(name) {
+		const n = String(name !== null && name !== void 0 ? name : "").trim();
+		return n === "" || /^(vector|group|frame|rectangle|ellipse|polygon|path|text)( ?\d+)?$/i.test(n) || isRawMermaidId(n);
+	}
+	function isRawMermaidId(name) {
+		return /mermaid-(svg-)?\d+(-|$)/.test(String(name !== null && name !== void 0 ? name : ""));
+	}
+	/** `mermaid-svg-0-Todo` -> `Todo` (the user-facing id), '' when nothing is left. */
+	function cleanRawId(name) {
+		const n = String(name !== null && name !== void 0 ? name : "");
+		if (/^mermaid-(?:svg-)?\d+$/.test(n)) return "";
+		const m = /^.*?mermaid-(?:svg-)?\d+-(.+)$/.exec(n);
+		return (m ? m[1] : n).replace(/-\d+$/, "").trim();
+	}
+	/** Element kind of a vector from its path, bounds and paint. */
+	function vectorKind(data, width, height, hasFill) {
+		if (Math.min(width, height) <= 1.5) return "Line";
+		const closed = /Z\s*$/i.test((data || "").trim());
+		if (!hasFill && !closed) return "Curve";
+		const k = classifyShape(data, width, height).kind;
+		switch (k) {
+			case "Subroutine":
+			case "Cylinder":
+			case "Flag":
+			case "Double Circle": return "Shape";
+			default: return k;
+		}
+	}
+	var clipLabel = (s, max = 28) => {
+		const t = s.replace(/\s+/g, " ").trim();
+		return t.length > max ? t.slice(0, max - 1) + "…" : t;
+	};
+	var contains = (r, px, py, pad = 1) => px >= r.x - pad && px <= r.x + r.width + pad && py >= r.y - pad && py <= r.y + r.height + pad;
+	/**
+	* For each text, the index of the SMALLEST vector rect (area > 0) whose bounds contain the text center,
+	* or -1. Ties keep the later (painted on top) rect.
+	*/
+	function assignTextsToRects(rects, texts) {
+		return texts.map((t) => {
+			const cx = t.x + t.width / 2;
+			const cy = t.y + t.height / 2;
+			let best = -1;
+			let bestArea = Infinity;
+			rects.forEach((r, i) => {
+				if (r.width < 2 || r.height < 2 || !contains(r, cx, cy)) return;
+				const a = r.width * r.height;
+				if (a <= bestArea) {
+					best = i;
+					bestArea = a;
+				}
+			});
+			return best;
+		});
+	}
+	/** True when the text's center lies inside the rect (cards: label centered in its box). */
+	function textCenteredIn(text, box, tolFrac = .2) {
+		const dx = text.x + text.width / 2 - (box.x + box.width / 2);
+		const dy = text.y + text.height / 2 - (box.y + box.height / 2);
+		return Math.abs(dx) <= Math.max(3, box.width * tolFrac) && Math.abs(dy) <= Math.max(3, box.height * tolFrac);
+	}
+	//#endregion
+	//#region plugin/src/generic.ts
+	var FALLBACK_KEY = "mermapix:fallback";
+	var isLive = (n) => Boolean(n) && !n.removed;
+	var readData = (n, key) => {
+		try {
+			return typeof n.getPluginData === "function" ? n.getPluginData(key) || "" : "";
+		} catch (_unused) {
+			return "";
+		}
+	};
+	/** True when an earlier step already built native structure (so this fallback must stay away). */
+	function isStructured(root) {
+		let found = false;
+		const visit = (n) => {
+			if (found || !isLive(n) || !("children" in n)) return;
+			for (const c of n.children) {
+				if (!isLive(c)) continue;
+				if (c.type === "GROUP") {
+					const name = String(c.name || "");
+					if (name === "Connectors" || isSequenceGroupName(name.toLowerCase())) {
+						found = true;
+						return;
+					}
+				} else if (c.type === "FRAME") {
+					if (readData(c, "mermapix:node") !== "" || readData(c, "mermapix:cluster") !== "" || readData(c, "mermapix:kind") === "ERD Table") {
+						found = true;
+						return;
+					}
+				}
+				if (c.type === "GROUP" || c.type === "FRAME") visit(c);
+			}
+		};
+		visit(root);
+		return found;
+	}
+	var WRAPPABLE = new Set([
+		"Diamond",
+		"Hexagon",
+		"Parallelogram",
+		"Trapezoid",
+		"Ellipse",
+		"Circle"
+	]);
+	var solidKey = (paints) => {
+		try {
+			return JSON.stringify((paints || []).map((p) => [
+				p.type,
+				p.color,
+				p.opacity
+			]));
+		} catch (_unused2) {
+			return "";
+		}
+	};
+	/** The user-facing id of the closest ancestor group still named `mermaid-svg-N-<id>` ('' when none). */
+	function nearestRawId(n) {
+		for (let p = n; p && p.type !== "PAGE"; p = p.parent) {
+			if (p.type === "FRAME" && !p.parent) break;
+			if (isRawMermaidId(p.name)) {
+				const id = cleanRawId(p.name);
+				if (id) return id;
+			}
+		}
+		return "";
+	}
+	function mergeStackedPairs(root) {
+		let merged = 0;
+		const visit = (n) => {
+			if (!isLive(n) || !("children" in n)) return;
+			for (const c of [...n.children]) if (isLive(c) && (c.type === "GROUP" || c.type === "FRAME")) visit(c);
+			if (!isLive(n)) return;
+			const vectors = n.children.filter((c) => isLive(c) && c.type === "VECTOR" && c.width >= 2 && c.height >= 2);
+			for (const stack of groupStackedBounds(vectors)) {
+				if (stack.length < 2) continue;
+				const fills = new Set(stack.filter(hasFill).map((v) => solidKey(v.fills)));
+				const strokes = new Set(stack.filter(hasStroke).map((v) => solidKey(v.strokes) + String(v.strokeWeight)));
+				if (fills.size > 1 || strokes.size > 1 || fills.size === 0 && strokes.size === 0) continue;
+				const fillVec = stack.find(hasFill) || stack[0];
+				const cls = classifyShape(pathDataOf(fillVec), fillVec.width, fillVec.height);
+				if (!cls.rectLike) continue;
+				const raw = nearestRawId(n);
+				paintFrameFromVectors(stack, cls, raw ? `${cls.kind}: ${clipLabel(raw)}` : cls.kind, n, Math.min(...stack.map((v) => n.children.indexOf(v))));
+				merged++;
+			}
+		};
+		visit(root);
+		return merged;
+	}
+	function convertCards(root) {
+		const groups = [];
+		const visit = (n) => {
+			if (!isLive(n) || !("children" in n)) return;
+			for (const c of [...n.children]) {
+				if (!isLive(c) || c.type !== "GROUP") continue;
+				visit(c);
+				groups.push(c);
+			}
+		};
+		visit(root);
+		let converted = 0;
+		for (const g of groups) {
+			if (!isLive(g) || !g.parent || String(g.name || "").includes("inlined-marker")) continue;
+			const parts = collectParts(g);
+			if (parts.texts.length !== 1 || parts.others.length > 0 || parts.vectors.length === 0) continue;
+			const stacks = groupStackedBounds(parts.vectors);
+			if (stacks.length !== 1) continue;
+			const vecs = stacks[0];
+			const v = vecs.find(hasFill) || vecs[0];
+			if (v.width < 4 || v.height < 4 || !(vecs.some(hasFill) || vecs.some(hasStroke))) continue;
+			const cls = classifyShape(pathDataOf(v), v.width, v.height);
+			if (!cls.rectLike && !WRAPPABLE.has(cls.kind)) continue;
+			const rv = absRect(v);
+			if (!textCenteredIn(absRect(parts.texts[0]), rv)) continue;
+			const res = convertShapeGroup(g);
+			if (!res) continue;
+			res.frame.name = res.label ? `${res.kind}: ${res.label}` : res.kind;
+			converted++;
+		}
+		return converted;
+	}
+	function nameLayers(root) {
+		const vectors = [];
+		const texts = [];
+		const groups = [];
+		const walk = (n) => {
+			if (!isLive(n) || !("children" in n)) return;
+			for (const c of n.children) {
+				if (!isLive(c)) continue;
+				if (c.type === "VECTOR") vectors.push(c);
+				else if (c.type === "TEXT") {
+					if ((c.characters || "").trim()) texts.push(c);
+				} else if (c.type === "GROUP") {
+					groups.push(c);
+					walk(c);
+				} else if (c.type === "FRAME") walk(c);
+			}
+		};
+		walk(root);
+		const owner = assignTextsToRects(vectors.map(absRect), texts.map(absRect));
+		const owned = /* @__PURE__ */ new Map();
+		owner.forEach((vi, ti) => {
+			if (vi >= 0) owned.set(vi, [...owned.get(vi) || [], clipLabel(texts[ti].characters)]);
+		});
+		const labelOf = /* @__PURE__ */ new Map();
+		owned.forEach((ls, vi) => {
+			if (ls.length === 1) labelOf.set(vi, ls[0]);
+		});
+		let named = 0;
+		vectors.forEach((v, i) => {
+			if (!isGenericLayerName(v.name) || String(v.name || "").includes("inlined-marker")) return;
+			const kind = vectorKind(pathDataOf(v), v.width, v.height, hasFill(v));
+			const label = labelOf.get(i);
+			const raw = isRawMermaidId(v.name) ? cleanRawId(v.name) : "";
+			v.name = label ? `${kind}: ${label}` : raw ? `${kind}: ${clipLabel(raw)}` : kind;
+			named++;
+		});
+		for (const g of groups) {
+			if (!isLive(g) || !isGenericLayerName(g.name) || String(g.name || "").includes("inlined-marker")) continue;
+			const raw = isRawMermaidId(g.name) ? cleanRawId(g.name) : "";
+			if (raw) {
+				g.name = clipLabel(raw, 40);
+				named++;
+				continue;
+			}
+			if (!g.children || g.children.length < 2) continue;
+			const parts = collectParts(g);
+			const ts = parts.texts.map((t) => clipLabel(t.characters));
+			if (ts.length === 1) g.name = `Group: ${ts[0]}`;
+			else if (ts.length > 1) g.name = `Group: ${ts[0]} +${ts.length - 1}`;
+			else if (parts.vectors.length > 0) {
+				const v = parts.vectors[0];
+				g.name = `${vectorKind(pathDataOf(v), v.width, v.height, hasFill(v))} Group`;
+			} else continue;
+			named++;
+		}
+		return named;
+	}
+	/** Runs the fallback on `root`; a no-op (ran: false) for dedicated diagram types and structured trees. */
+	function applyGenericFallback(root, diagramType) {
+		const mode = fallbackMode(diagramType);
+		const none = {
+			ran: false,
+			mode,
+			merged: 0,
+			cards: 0,
+			named: 0
+		};
+		if (!isLive(root) || mode === "skip") return none;
+		if (!(diagramType === "swimlane") && isStructured(root)) return none;
+		let merged = 0;
+		let cards = 0;
+		if (mode === "nodes") {
+			merged = mergeStackedPairs(root);
+			cards = convertCards(root);
+		}
+		const named = nameLayers(root);
+		try {
+			if (typeof root.setPluginData === "function") root.setPluginData(FALLBACK_KEY, diagramType || "unknown");
+		} catch (_unused3) {}
+		return {
+			ran: true,
+			mode,
+			merged,
+			cards,
+			named
+		};
 	}
 	//#endregion
 	//#region plugin/src/cleanup.ts
@@ -3328,6 +4317,29 @@
 			}
 		},
 		{
+			name: "class",
+			run: (rootNode) => {
+				try {
+					const classes = convertClasses(rootNode);
+					const notes = convertClassNotes(rootNode).concat(convertClassInterfaces(rootNode));
+					if (classes.length === 0 && notes.length === 0) return;
+					convertClusters(rootNode, {
+						prefix: "Namespace",
+						kind: "Namespace"
+					});
+					nestIntoClusters(rootNode);
+				} catch (_unused2) {}
+			}
+		},
+		{
+			name: "state",
+			run: (rootNode) => {
+				try {
+					convertStates(rootNode);
+				} catch (_unused3) {}
+			}
+		},
+		{
 			name: "edge-labels",
 			run: (rootNode) => {
 				convertEdgeLabels(rootNode);
@@ -3337,6 +4349,14 @@
 			name: "connectors",
 			run: (rootNode) => {
 				arrangeFlowchart(rootNode);
+			}
+		},
+		{
+			name: "generic",
+			run: (rootNode, _theme, ctx) => {
+				try {
+					applyGenericFallback(rootNode, ctx && ctx.diagramType);
+				} catch (_unused4) {}
 			}
 		}
 	];
@@ -3354,11 +4374,11 @@
 				opacity: 1,
 				visible: true
 			}];
-		} catch (_unused2) {}
+		} catch (_unused5) {}
 	}
-	function optimizeDiagramNodes(rootNode, themeVariables) {
+	function optimizeDiagramNodes(rootNode, themeVariables, diagramType) {
 		purgeJunkNodes(rootNode);
-		for (const step of DIAGRAM_STEPS) step.run(rootNode, themeVariables);
+		for (const step of DIAGRAM_STEPS) step.run(rootNode, themeVariables, { diagramType });
 		flattenWrappers(rootNode);
 		elevateSequenceNumbers(rootNode);
 		unwrapRootGroup(rootNode);
@@ -3393,6 +4413,14 @@
 						style: "Bold"
 					},
 					{
+						family: "Inter",
+						style: "Italic"
+					},
+					{
+						family: "Inter",
+						style: "Bold Italic"
+					},
+					{
 						family: "Arial",
 						style: "Regular"
 					},
@@ -3414,7 +4442,7 @@
 			}
 			ensureAllLayersVisible(node);
 			figma.currentPage.appendChild(node);
-			optimizeDiagramNodes(node, msg.themeVariables);
+			optimizeDiagramNodes(node, msg.themeVariables, diagramTypeFromSvg(msg.svg));
 			ensureAllLayersVisible(node);
 			const center = figma.viewport.center;
 			node.x = Math.round(center.x - node.width / 2);

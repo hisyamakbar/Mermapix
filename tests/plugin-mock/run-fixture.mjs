@@ -8,7 +8,8 @@ import { runPlugin } from './figma-mock.mjs'
 import { importSvg } from './svg-import.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-export const CODE = path.resolve(here, '../../plugin/code.js')
+// MERMAPIX_CODE=<path> runs the tests against another bundle (e.g. the pre-change code.js, to prove a test is red first).
+export const CODE = process.env.MERMAPIX_CODE || path.resolve(here, '../../plugin/code.js')
 export const FIXTURE_DIR = path.resolve(here, '../fixtures/plugin')
 
 // Subset of src/themes/presets.ts THEME_PRESETS (what the plugin UI posts as `themeVariables`).

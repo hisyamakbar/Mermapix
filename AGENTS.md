@@ -72,7 +72,9 @@ Mermapix/
 │   │   ├── erd.ts                  # ERD entity detection + native Auto Layout table conversion
 │   │   ├── cleanup.ts              # Purge, wrapper dissolve, sequence-number elevate, root unwrap, final naming
 │   │   ├── markers.ts              # Pure SVG marker inliner (copy of src/export/markers.ts)
-│   │   ├── svgPrep.ts              # Pure pre-import SVG prep: inline-once + unique ids on marker groups
+│   │   ├── svgPrep.ts              # Pure pre-import SVG prep: drop label-only clipPaths, inline-once + unique ids on marker groups
+│   │   ├── treemap.ts              # Treemap sections/leaves -> nested frames (+ pure treemapGeometry.ts)
+│   │   ├── railroad.ts             # Railroad grammars: terminal/non-terminal frames, Rule groups (+ pure railroadGeometry.ts)
 │   │   ├── naming.ts               # Pure helpers: ERD entity matcher, marker kind/layer names, connector/shape patterns
 │   │   ├── erdPaints.ts            # Pure per-part ERD fill/border extraction (header, rows, border)
 │   │   ├── erdLayout.ts            # Pure ERD column-width planner

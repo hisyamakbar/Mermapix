@@ -39,6 +39,9 @@ const readData = (n: any, key: string): string => {
   }
 }
 
+/** Frame kinds (`mermapix:kind`) produced by dedicated converters: ERD tables, treemap (9.2), railroad (9.2). */
+const STRUCTURED_KINDS = new Set(['ERD Table', 'Treemap Section', 'Treemap Leaf', 'Railroad Terminal', 'Railroad NonTerminal', 'Railroad Special'])
+
 /** True when an earlier step already built native structure (so this fallback must stay away). */
 export function isStructured(root: any): boolean {
   let found = false
@@ -48,12 +51,12 @@ export function isStructured(root: any): boolean {
       if (!isLive(c)) continue
       if (c.type === 'GROUP') {
         const name = String(c.name || '')
-        if (name === 'Connectors' || isSequenceGroupName(name.toLowerCase())) {
+        if (name === 'Connectors' || isSequenceGroupName(name.toLowerCase()) || readData(c, 'mermapix:kind') === 'Railroad Rule') {
           found = true
           return
         }
       } else if (c.type === 'FRAME') {
-        if (readData(c, NODE_ID_KEY) !== '' || readData(c, CLUSTER_ID_KEY) !== '' || readData(c, 'mermapix:kind') === 'ERD Table') {
+        if (readData(c, NODE_ID_KEY) !== '' || readData(c, CLUSTER_ID_KEY) !== '' || STRUCTURED_KINDS.has(readData(c, 'mermapix:kind'))) {
           found = true
           return
         }

@@ -77,6 +77,8 @@ export function dissolveRedundantWrappers(parent: any): void {
         name.includes('marker') ||
         // Phase 8.3 structure: edge groups may hold a single line and must stay a group
         name.startsWith('edge: ') ||
+        // Phase 9.2: railroad rule groups
+        name.startsWith('rule: ') ||
         name === 'connectors' ||
         // Phase 8.4 structure: sequence strata and message groups
         isSequenceGroupName(name)

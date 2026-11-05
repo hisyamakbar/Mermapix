@@ -83,6 +83,18 @@ export async function runPlugin(codePath, svg, buildScene, extraMsg = {}) {
     loadFontAsync: async (f) => { log.push(['font', f]) },
     createNodeFromSvg: (s) => { svgSeen = s; root = buildScene(env, s); return root },
     createFrame: () => new MockNode(env, 'FRAME'),
+    // Like Cmd+G: members keep their absolute position (coordinates are parent-frame relative and
+    // GROUPs are transparent, so numbers are unchanged); the group takes the union bounds.
+    group: (nodes, parent, index) => {
+      if (!nodes.length) throw new Error('figma.group: no nodes')
+      const g = new MockNode(env, 'GROUP')
+      const x0 = Math.min(...nodes.map((n) => n.x)), y0 = Math.min(...nodes.map((n) => n.y))
+      const x1 = Math.max(...nodes.map((n) => n.x + n.width)), y1 = Math.max(...nodes.map((n) => n.y + n.height))
+      Object.assign(g, { x: x0, y: y0, width: x1 - x0, height: y1 - y0 })
+      parent.insertChild(index ?? parent.children.length, g)
+      for (const n of nodes) g.appendChild(n)
+      return g
+    },
     currentPage: { appendChild: (n) => log.push(['page.append', n.name]), selection: [] },
     viewport: { center: { x: 500, y: 400 }, scrollAndZoomIntoView: (n) => log.push(['zoom', n.length]) },
     notify: (...a) => log.push(['notify', a]),

@@ -1,8 +1,9 @@
-// Flowchart / sitemap conversion (Phase 8.2: node shapes; 8.3 will add clusters + connectors here).
+// Flowchart / sitemap node conversion (Phase 8.2). Subgraphs -> frames + membership live in
+// subgraphs.ts, edge grouping/naming in connectors.ts (Phase 8.3); optimize.ts wires the steps.
 //
 // Mermaid flowchart node groups are named `<svgId>-flowchart-<nodeId>-<n>` by Figma's importer
 // (it names every GROUP by its SVG id). Cluster/subgraph groups and edge vectors (`…-L_a_b_0`)
-// do not match and are left untouched for now.
+// do not match this pattern; they are handled by the 8.3 modules.
 
 import { convertShapeGroup, type ConvertedShape } from './shapes.ts'
 

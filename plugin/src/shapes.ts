@@ -43,9 +43,9 @@ export interface ConvertShapeOptions {
 
 const isLive = (n: any): boolean => Boolean(n) && !n.removed
 
-const hasFill = (v: any): boolean =>
+export const hasFill = (v: any): boolean =>
   Array.isArray(v.fills) && v.fills.length > 0 && v.fills[0].visible !== false && v.fills[0].opacity !== 0
-const hasStroke = (v: any): boolean =>
+export const hasStroke = (v: any): boolean =>
   Array.isArray(v.strokes) &&
   v.strokes.length > 0 &&
   v.strokes[0].visible !== false &&
@@ -94,7 +94,7 @@ export function collectParts(container: any): Collected {
   return out
 }
 
-function cloneAll<T>(arr: T[]): T[] {
+export function cloneAll<T>(arr: T[]): T[] {
   try {
     return JSON.parse(JSON.stringify(arr))
   } catch {
@@ -102,7 +102,7 @@ function cloneAll<T>(arr: T[]): T[] {
   }
 }
 
-function pathDataOf(v: any): string {
+export function pathDataOf(v: any): string {
   const p = v && Array.isArray(v.vectorPaths) ? v.vectorPaths[0] : null
   return p && typeof p.data === 'string' ? p.data : ''
 }
@@ -184,14 +184,14 @@ export function createCenteredFrame(spec: FrameSpec): any {
   return f
 }
 
-function applyStroke(frame: any, src: any, dash: number[]): void {
+export function applyStroke(frame: any, src: any, dash: number[]): void {
   frame.strokes = src.strokes
   frame.strokeWeight = src.strokeWeight
   frame.strokeAlign = src.strokeAlign || 'CENTER'
   if (isRealDash(dash)) frame.dashPattern = dash
 }
 
-function tag(frame: any, key: string, value: string | undefined): void {
+export function tag(frame: any, key: string, value: string | undefined): void {
   if (value && typeof frame.setPluginData === 'function') {
     try {
       frame.setPluginData(key, value)

@@ -1530,7 +1530,7 @@
 	}
 	//#endregion
 	//#region plugin/src/shapes.ts
-	var isLive = (n) => Boolean(n) && !n.removed;
+	var isLive$2 = (n) => Boolean(n) && !n.removed;
 	var hasFill = (v) => Array.isArray(v.fills) && v.fills.length > 0 && v.fills[0].visible !== false && v.fills[0].opacity !== 0;
 	var hasStroke = (v) => Array.isArray(v.strokes) && v.strokes.length > 0 && v.strokes[0].visible !== false && v.strokes[0].opacity !== 0 && Number(v.strokeWeight) > 0;
 	/** Origin of the coordinate space children of `parent` live in (GROUPs are transparent). */
@@ -1569,9 +1569,9 @@
 			others: []
 		};
 		const visit = (n) => {
-			if (!isLive(n) || !("children" in n)) return;
+			if (!isLive$2(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive(c)) continue;
+				if (!isLive$2(c)) continue;
 				if (c.type === "VECTOR") out.vectors.push(c);
 				else if (c.type === "TEXT") {
 					if ((c.characters || "").trim().length > 0) out.texts.push(c);
@@ -1694,7 +1694,7 @@
 	* Returns null (group untouched) when it has no vector, or contains unknown node types.
 	*/
 	function convertShapeGroup(group, opts = {}) {
-		if (!isLive(group) || !group.parent || !("children" in group)) return null;
+		if (!isLive$2(group) || !group.parent || !("children" in group)) return null;
 		const parts = collectParts(group);
 		if (parts.vectors.length === 0 || parts.others.length > 0) return null;
 		const visuals = groupStackedBounds(parts.vectors).map((vs) => ({
@@ -1809,7 +1809,7 @@
 			t.y = ry;
 			textWidth = Math.max(textWidth, t.width);
 		}
-		for (const v of parts.vectors) if (isLive(v) && v.parent !== frame) try {
+		for (const v of parts.vectors) if (isLive$2(v) && v.parent !== frame) try {
 			v.remove();
 		} catch (_unused12) {}
 		try {
@@ -1864,6 +1864,468 @@
 			if (res) results.push(_objectSpread2(_objectSpread2({}, res), {}, { nodeId }));
 		}
 		return results;
+	}
+	//#endregion
+	//#region plugin/src/connectorGeometry.ts
+	var rectArea = (r) => Math.max(0, r.width) * Math.max(0, r.height);
+	/** True when `inner` lies fully inside `outer` (tolerance in px for stroke/rounding noise). */
+	function containsRect(outer, inner, tol = 1) {
+		return inner.x >= outer.x - tol && inner.y >= outer.y - tol && inner.x + inner.width <= outer.x + outer.width + tol && inner.y + inner.height <= outer.y + outer.height + tol;
+	}
+	/**
+	* The smallest candidate that contains `item` and is strictly larger than it (a cluster can never
+	* contain itself or a same-size twin, which keeps the membership tree acyclic).
+	*/
+	function smallestContainer(item, candidates, tol = 1) {
+		const itemArea = rectArea(item);
+		let best = null;
+		for (const c of candidates) {
+			if (c === item) continue;
+			if (rectArea(c) <= itemArea + 1) continue;
+			if (!containsRect(c, item, tol)) continue;
+			if (!best || rectArea(c) < rectArea(best)) best = c;
+		}
+		return best;
+	}
+	var EDGE_NAME_RE = /(?:^|-)L_(.+)_(\d+)$/;
+	/** Mermaid edge layer names look like `<svgId>-L_<from>_<to>_<n>`. Returns `<from>_<to>` or null. */
+	function edgeBodyFromName(name) {
+		if (!name || typeof name !== "string") return null;
+		if (name.includes("inlined-marker")) return null;
+		const m = EDGE_NAME_RE.exec(name);
+		return m ? m[1] : null;
+	}
+	/**
+	* Splits `<from>_<to>` into the two ids. Node ids may contain underscores, so every split is
+	* checked against the known ids (nodes and subgraphs); falls back to the first underscore.
+	*/
+	function resolveEdgeEndpoints(body, knownIds) {
+		if (!body) return null;
+		const known = new Set(knownIds);
+		const splits = [];
+		for (let i = 1; i < body.length - 1; i++) if (body[i] === "_") splits.push(i);
+		if (splits.length === 0) return null;
+		for (const i of splits) {
+			const from = body.slice(0, i);
+			const to = body.slice(i + 1);
+			if (known.has(from) && known.has(to)) return {
+				from,
+				to,
+				known: true
+			};
+		}
+		const i = splits[0];
+		return {
+			from: body.slice(0, i),
+			to: body.slice(i + 1),
+			known: false
+		};
+	}
+	/** Cluster (subgraph) group layer names: `<svgId>-<subgraphId>`, e.g. `mermaid-svg-0-S1`. */
+	function clusterIdFromName(name) {
+		if (!name || typeof name !== "string") return null;
+		if (name.includes("inlined-marker") || name.includes("-flowchart-") || name.includes("entity-")) return null;
+		if (EDGE_NAME_RE.test(name)) return null;
+		const m = /^.*?svg-\d+-(.+)$/.exec(name);
+		return m ? m[1] : null;
+	}
+	var clip = (s, max) => s.length > max ? s.slice(0, max - 1) + "…" : s;
+	function edgeDisplayName(fromLabel, toLabel) {
+		return `Edge: ${clip(fromLabel, 40)} → ${clip(toLabel, 40)}`;
+	}
+	/** Absolute polyline(s) of a vector, from its (origin-translated) path data. */
+	function vectorPolyline(data, x, y) {
+		const cmds = parsePathData(data);
+		if (!cmds) return [];
+		const out = [];
+		for (const sub of flattenPath(cmds).subpaths) for (const p of sub) out.push({
+			x: p.x + x,
+			y: p.y + y
+		});
+		return out;
+	}
+	function distanceToPolyline(p, pts) {
+		if (pts.length === 0) return Infinity;
+		let best = Infinity;
+		for (let i = 0; i < pts.length; i++) {
+			const a = pts[i];
+			const b = pts[i + 1] || a;
+			const dx = b.x - a.x;
+			const dy = b.y - a.y;
+			const len2 = dx * dx + dy * dy;
+			const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+			const d = Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+			if (d < best) best = d;
+		}
+		return best;
+	}
+	/** True when any sampled point of `pts` lies inside `rect` grown by `pad`. */
+	function polylineHitsRect(pts, rect, pad = 0) {
+		return pts.some((p) => p.x >= rect.x - pad && p.x <= rect.x + rect.width + pad && p.y >= rect.y - pad && p.y <= rect.y + rect.height + pad);
+	}
+	function rectsOverlap(a, b, pad = 0) {
+		return a.x < b.x + b.width + pad && b.x < a.x + a.width + pad && a.y < b.y + b.height + pad && b.y < a.y + a.height + pad;
+	}
+	/**
+	* For each label center, the index of the edge it belongs to, or -1 when no edge is close enough
+	* or two edges are about equally close (ambiguous).
+	*/
+	function assignLabelsToEdges(edges, centers) {
+		return centers.map((c) => {
+			let best = -1;
+			let bestD = Infinity;
+			let second = Infinity;
+			edges.forEach((e, i) => {
+				const d = distanceToPolyline(c, e.pts);
+				if (d < bestD) {
+					second = bestD;
+					bestD = d;
+					best = i;
+				} else if (d < second) second = d;
+			});
+			if (best < 0 || bestD > 32) return -1;
+			if (second - bestD < 12) return -1;
+			return best;
+		});
+	}
+	//#endregion
+	//#region plugin/src/subgraphs.ts
+	var CLUSTER_ID_KEY = "mermapix:cluster";
+	var CLUSTER_LABEL_KEY = "mermapix:label";
+	var NODE_ID_KEY = "mermapix:node";
+	var isLive$1 = (n) => Boolean(n) && !n.removed;
+	var readData$1 = (n, key) => {
+		try {
+			return typeof n.getPluginData === "function" ? n.getPluginData(key) || "" : "";
+		} catch (_unused) {
+			return "";
+		}
+	};
+	var isNodeFrame = (n) => n && n.type === "FRAME" && readData$1(n, "mermapix:node") !== "";
+	var isClusterFrame = (n) => n && n.type === "FRAME" && readData$1(n, "mermapix:cluster") !== "";
+	/** Absolute bounds of `n` in root-frame coordinates (GROUPs are coordinate-transparent). */
+	function absRect(n) {
+		const o = childOrigin(n.parent);
+		return {
+			x: n.x + o.x,
+			y: n.y + o.y,
+			width: n.width,
+			height: n.height
+		};
+	}
+	/** Finds cluster groups below `root` (descending through transparent GROUPs only). */
+	function findClusterGroups(root) {
+		const out = [];
+		const visit = (n) => {
+			if (!isLive$1(n) || !("children" in n)) return;
+			for (const c of [...n.children]) {
+				if (!isLive$1(c) || c.type !== "GROUP") continue;
+				const id = clusterIdFromName(c.name);
+				if (id !== null) {
+					const parts = collectParts(c);
+					const v = parts.vectors.length === 1 ? parts.vectors[0] : null;
+					if (v && parts.others.length === 0 && v.width >= 1 && v.height >= 1 && (hasFill(v) || hasStroke(v))) {
+						out.push({
+							group: c,
+							id,
+							vector: v,
+							texts: parts.texts
+						});
+						continue;
+					}
+				}
+				visit(c);
+			}
+		};
+		visit(root);
+		return out;
+	}
+	function convertClusterGroup(cg) {
+		const { group, vector: v, texts } = cg;
+		const parentNode = group.parent;
+		const index = parentNode.children.indexOf(group);
+		const title = labelOf(texts);
+		const cls = classifyShape(pathDataOf(v), v.width, v.height);
+		const frame = figma.createFrame();
+		frame.name = `Subgraph: ${title || cg.id}`;
+		frame.layoutMode = "NONE";
+		frame.resize(v.width, v.height);
+		parentNode.insertChild(index, frame);
+		const pos = rebase(v.x, v.y, v.parent, parentNode);
+		frame.x = pos.x;
+		frame.y = pos.y;
+		frame.clipsContent = false;
+		frame.fills = hasFill(v) ? cloneAll(v.fills) : [];
+		frame.strokes = [];
+		if (hasStroke(v)) applyStroke(frame, v, Array.isArray(v.dashPattern) ? v.dashPattern : []);
+		else if (isRealDash(v.dashPattern)) frame.dashPattern = v.dashPattern;
+		frame.cornerRadius = cls.rectLike ? cls.cornerRadius : 0;
+		for (const t of texts) {
+			const rel = rebase(t.x, t.y, t.parent, parentNode);
+			const cx = rel.x + t.width / 2 - pos.x;
+			const cy = rel.y + t.height / 2 - pos.y;
+			styleShapeText(t);
+			frame.appendChild(t);
+			t.x = cx - t.width / 2;
+			t.y = cy - t.height / 2;
+			try {
+				t.constraints = {
+					horizontal: "CENTER",
+					vertical: "MIN"
+				};
+			} catch (_unused2) {}
+		}
+		v.remove();
+		try {
+			group.remove();
+		} catch (_unused3) {}
+		tag(frame, CLUSTER_ID_KEY, cg.id);
+		tag(frame, CLUSTER_LABEL_KEY, title || cg.id);
+		tag(frame, "mermapix:kind", "Subgraph");
+		return {
+			frame,
+			id: cg.id,
+			title: title || cg.id
+		};
+	}
+	/** Converts every cluster group below `root` into a native frame (document order kept). */
+	function convertClusters(root) {
+		return findClusterGroups(root).map(convertClusterGroup);
+	}
+	/** Node + cluster frames below `root`, in document (z) order, descending through GROUPs only. */
+	function collectItems(root) {
+		const items = [];
+		const visit = (n) => {
+			if (!isLive$1(n) || !("children" in n)) return;
+			for (const c of [...n.children]) {
+				if (!isLive$1(c)) continue;
+				if (isClusterFrame(c) || isNodeFrame(c)) items.push({
+					node: c,
+					rect: absRect(c),
+					order: items.length,
+					isCluster: isClusterFrame(c)
+				});
+				else if (c.type === "GROUP") visit(c);
+			}
+		};
+		visit(root);
+		return items;
+	}
+	/** Reparents `node` under `parent` (top of its children) keeping its absolute position. */
+	function moveKeepingAbs(node, parent, abs) {
+		parent.appendChild(node);
+		const o = childOrigin(parent);
+		node.x = abs.x - o.x;
+		node.y = abs.y - o.y;
+	}
+	/**
+	* Moves each node/cluster frame into the smallest cluster frame that fully contains it.
+	* Order inside a cluster: nested clusters first, then nodes (Mermaid paints clusters under nodes),
+	* each group in the original document order. Returns the id -> parent cluster id map.
+	*/
+	function nestIntoClusters(root) {
+		const items = collectItems(root);
+		const clusters = items.filter((i) => i.isCluster);
+		const clusterRects = clusters.map((c) => _objectSpread2(_objectSpread2({}, c.rect), {}, { item: c }));
+		const parentOf = /* @__PURE__ */ new Map();
+		for (const it of items) {
+			const found = smallestContainer(it.rect, clusterRects.filter((c) => c.item !== it));
+			if (found) parentOf.set(it, found.item);
+		}
+		const depth = (it) => {
+			let d = 0;
+			let p = parentOf.get(it);
+			while (p && d < 1e3) {
+				d++;
+				p = parentOf.get(p);
+			}
+			return d;
+		};
+		const moved = /* @__PURE__ */ new Map();
+		const idOf = (it) => readData$1(it.node, it.isCluster ? CLUSTER_ID_KEY : NODE_ID_KEY);
+		const place = (it) => {
+			const parent = parentOf.get(it);
+			if (!parent) return;
+			moveKeepingAbs(it.node, parent.node, {
+				x: it.rect.x,
+				y: it.rect.y
+			});
+			moved.set(idOf(it), idOf(parent));
+		};
+		const clusterOrder = [...clusters].sort((a, b) => depth(a) - depth(b) || a.order - b.order);
+		for (const c of clusterOrder) place(c);
+		for (const n of items.filter((i) => !i.isCluster)) place(n);
+		return moved;
+	}
+	//#endregion
+	//#region plugin/src/connectors.ts
+	var isLive = (n) => Boolean(n) && !n.removed;
+	var readData = (n, key) => {
+		try {
+			return typeof n.getPluginData === "function" ? n.getPluginData(key) || "" : "";
+		} catch (_unused) {
+			return "";
+		}
+	};
+	var isEdgeLabelFrame = (n) => Boolean(n) && n.type === "FRAME" && readData(n, "mermapix:kind") === "Edge Label";
+	/** Edge vectors (`…L_<from>_<to>_<n>`) below `root`, descending through transparent GROUPs only. */
+	function collectEdges(root) {
+		const edges = [];
+		const visit = (n) => {
+			if (!isLive(n) || !("children" in n)) return;
+			const kids = [...n.children];
+			for (let i = 0; i < kids.length; i++) {
+				const c = kids[i];
+				if (!isLive(c)) continue;
+				if (c.type === "VECTOR") {
+					const body = edgeBodyFromName(c.name);
+					if (body === null) continue;
+					const markers = [];
+					for (let j = i + 1; j < kids.length; j++) {
+						const m = kids[j];
+						if (isLive(m) && m.type === "GROUP" && String(m.name || "").includes("inlined-marker")) markers.push(m);
+						else break;
+					}
+					const a = absRect(c);
+					edges.push({
+						vector: c,
+						markers,
+						body,
+						pts: vectorPolyline(pathDataOf(c), a.x, a.y),
+						markerRects: markers.map(absRect),
+						weight: Number(c.strokeWeight) || 1,
+						order: edges.length
+					});
+				} else if (c.type === "GROUP" && !String(c.name || "").includes("inlined-marker")) visit(c);
+			}
+		};
+		visit(root);
+		return edges;
+	}
+	/** id -> human label for every node frame and cluster frame anywhere below `root`. */
+	function collectLabels(root) {
+		const labels = /* @__PURE__ */ new Map();
+		const visit = (n) => {
+			if (!isLive(n) || !("children" in n)) return;
+			for (const c of n.children) {
+				if (!isLive(c)) continue;
+				if (isNodeFrame(c)) labels.set(readData(c, NODE_ID_KEY), c.name && c.name !== "Shape" ? c.name : readData(c, NODE_ID_KEY));
+				else if (isClusterFrame(c)) labels.set(readData(c, CLUSTER_ID_KEY), readData(c, CLUSTER_LABEL_KEY));
+				if (c.type === "FRAME" || c.type === "GROUP") visit(c);
+			}
+		};
+		visit(root);
+		return labels;
+	}
+	function collectEdgeLabelFrames(root) {
+		const out = [];
+		const visit = (n) => {
+			if (!isLive(n) || !("children" in n)) return;
+			for (const c of [...n.children]) {
+				if (!isLive(c)) continue;
+				if (isEdgeLabelFrame(c)) out.push(c);
+				else if (c.type === "GROUP" && !String(c.name || "").includes("inlined-marker")) visit(c);
+			}
+		};
+		visit(root);
+		return out;
+	}
+	/** Top-level (not inside a cluster frame) cluster and node frames, in document order. */
+	function collectTopLevel(root) {
+		const clusters = [];
+		const nodes = [];
+		const visit = (n) => {
+			if (!isLive(n) || !("children" in n)) return;
+			for (const c of [...n.children]) {
+				if (!isLive(c)) continue;
+				if (isClusterFrame(c)) clusters.push(c);
+				else if (isNodeFrame(c)) nodes.push(c);
+				else if (c.type === "GROUP") visit(c);
+			}
+		};
+		visit(root);
+		return {
+			clusters,
+			nodes
+		};
+	}
+	function makeGroup(members, parent, name) {
+		const live = members.filter(isLive);
+		if (live.length === 0) return null;
+		try {
+			const g = figma.group(live, parent);
+			g.name = name;
+			return g;
+		} catch (_unused2) {
+			return null;
+		}
+	}
+	/**
+	* Arranges the flowchart root: top-level subgraph frames, loose node frames, then `Connectors`.
+	* Everything keeps its absolute position (members are only reparented / grouped).
+	*/
+	function arrangeFlowchart(root) {
+		const result = {
+			edges: 0,
+			grouped: 0,
+			labelsInEdges: 0,
+			labelsLoose: 0
+		};
+		if (!isLive(root) || root.type !== "FRAME") return result;
+		const labelMap = collectLabels(root);
+		const edges = collectEdges(root);
+		const labelFrames = collectEdgeLabelFrames(root);
+		const { clusters, nodes } = collectTopLevel(root);
+		if (clusters.length === 0 && nodes.length === 0) return result;
+		const labelRects = labelFrames.map(absRect);
+		const owner = assignLabelsToEdges(edges.map((e) => ({ pts: e.pts })), labelRects.map((r) => ({
+			x: r.x + r.width / 2,
+			y: r.y + r.height / 2
+		})));
+		const embedded = edges.map(() => []);
+		const loose = [];
+		labelFrames.forEach((lf, li) => {
+			const e = owner[li];
+			if (e < 0) {
+				loose.push(lf);
+				return;
+			}
+			const r = labelRects[li];
+			if (edges.some((f) => f.order > e && (polylineHitsRect(f.pts, r, f.weight / 2) || f.markerRects.some((m) => rectsOverlap(m, r))))) loose.push(lf);
+			else embedded[e].push(lf);
+		});
+		const hoist = (n) => {
+			if (n.parent !== root) moveKeepingAbs(n, root, absRect(n));
+			else root.appendChild(n);
+		};
+		clusters.forEach(hoist);
+		nodes.forEach(hoist);
+		const edgeGroups = [];
+		const known = [...labelMap.keys()];
+		edges.forEach((e, i) => {
+			const ends = resolveEdgeEndpoints(e.body, known);
+			const label = (id) => labelMap.get(id) || id;
+			const name = ends ? edgeDisplayName(label(ends.from), label(ends.to)) : `Edge: ${e.body}`;
+			try {
+				e.vector.name = "Line";
+			} catch (_unused3) {}
+			const members = [
+				e.vector,
+				...e.markers,
+				...embedded[i]
+			];
+			for (const m of members) if (m.parent !== root) moveKeepingAbs(m, root, absRect(m));
+			const g = makeGroup(members, root, name);
+			if (g) edgeGroups.push(g);
+		});
+		result.edges = edges.length;
+		result.grouped = edgeGroups.length;
+		result.labelsInEdges = embedded.reduce((n, a) => n + a.length, 0);
+		result.labelsLoose = loose.length;
+		for (const lf of loose) if (lf.parent !== root) moveKeepingAbs(lf, root, absRect(lf));
+		const connectors = makeGroup([...edgeGroups, ...loose], root, "Connectors");
+		if (connectors) root.appendChild(connectors);
+		return result;
 	}
 	//#endregion
 	//#region plugin/src/edgeLabels.ts
@@ -1938,7 +2400,7 @@
 				const name = (child.name || "").toLowerCase();
 				const isGeneric = name === "group" || name === "" || name === "label" || name.startsWith("root-") || name === "edgepath" || name === "edgelabel";
 				const isSingleChild = child.children.length === 1;
-				const isProtectedNode = name.includes("flowchart-") || name.includes("entity-") || name.includes("actor") || name.includes("subgraph") || name.includes("cluster") || name.includes("inlined-marker") || name.includes("marker");
+				const isProtectedNode = name.includes("flowchart-") || name.includes("entity-") || name.includes("actor") || name.includes("subgraph") || name.includes("cluster") || name.includes("inlined-marker") || name.includes("marker") || name.startsWith("edge: ") || name === "connectors";
 				if ((isGeneric || isSingleChild) && !isProtectedNode) {
 					const childIndex = parent.children.indexOf(child);
 					const grandChildren = [...child.children];
@@ -1982,11 +2444,29 @@
 			} catch (_unused8) {}
 		}
 	}
+	/** Unnamed vectors/groups inside a named marker group become "Marker Path" (no leftover "Vector"). */
+	function nameMarkerParts(marker) {
+		if (!marker || !("children" in marker)) return;
+		const base = "Marker Path";
+		const visit = (n) => {
+			for (const c of [...n.children || []]) {
+				if (!c || c.removed) continue;
+				if (c.type === "VECTOR" && (!c.name || c.name === "Vector")) c.name = base;
+				else if (c.type === "GROUP" && (!c.name || c.name === "Group")) {
+					c.name = base;
+					visit(c);
+				}
+			}
+		};
+		visit(marker);
+	}
 	/** Pass 5: final sweep to clean remaining layer names and label connectors & markers. */
 	function finalClean(n) {
 		if (!n || n.removed) return;
-		if ((n.name || "").toLowerCase().includes("inlined-marker")) n.name = markerLayerName(n.name);
-		else if (n.type === "TEXT") {
+		if ((n.name || "").toLowerCase().includes("inlined-marker")) {
+			n.name = markerLayerName(n.name);
+			nameMarkerParts(n);
+		} else if (n.type === "TEXT") {
 			const preview = (n.characters || "").trim().replace(/\s+/g, " ");
 			if (!n.name || n.name === "Text" || n.name === "Group") n.name = preview.length > 28 ? preview.slice(0, 28) + "..." : preview;
 		} else if (n.type === "VECTOR") {
@@ -2008,13 +2488,21 @@
 		{
 			name: "flowchart",
 			run: (rootNode) => {
-				convertFlowchartNodes(rootNode);
+				if (convertFlowchartNodes(rootNode).length === 0) return;
+				convertClusters(rootNode);
+				nestIntoClusters(rootNode);
 			}
 		},
 		{
 			name: "edge-labels",
 			run: (rootNode) => {
 				convertEdgeLabels(rootNode);
+			}
+		},
+		{
+			name: "connectors",
+			run: (rootNode) => {
+				arrangeFlowchart(rootNode);
 			}
 		}
 	];

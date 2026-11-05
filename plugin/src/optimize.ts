@@ -2,7 +2,7 @@
 //
 // Pipeline (order matters and must stay identical):
 //   1. purgeJunkNodes        - drop ghost/empty layers
-//   2. DIAGRAM_STEPS         - per-diagram-type conversions (ERD tables today)
+//   2. DIAGRAM_STEPS         - per-diagram-type conversions (ERD tables, flowchart nodes/subgraphs/connectors)
 //   3. flattenWrappers       - dissolve redundant wrapper groups (5 passes, each followed by a purge)
 //   4. elevateSequenceNumbers
 //   5. unwrapRootGroup
@@ -14,6 +14,8 @@
 
 import { convertErdTables } from './erd.ts'
 import { convertFlowchartNodes } from './flowchart.ts'
+import { convertClusters, nestIntoClusters } from './subgraphs.ts'
+import { arrangeFlowchart } from './connectors.ts'
 import { convertEdgeLabels } from './edgeLabels.ts'
 import { parseColorToFigma } from './theme.ts'
 import {
@@ -37,7 +39,11 @@ const erdStep: DiagramStep = {
 const flowchartStep: DiagramStep = {
   name: 'flowchart',
   run: (rootNode) => {
-    convertFlowchartNodes(rootNode)
+    const nodes = convertFlowchartNodes(rootNode)
+    if (nodes.length === 0) return
+    // Subgraphs -> frames, then every node/cluster frame into the smallest cluster that contains it.
+    convertClusters(rootNode)
+    nestIntoClusters(rootNode)
   },
 }
 
@@ -49,8 +55,19 @@ const edgeLabelStep: DiagramStep = {
   },
 }
 
+/**
+ * Flowchart connectors: edge line + markers + label -> `Edge: A → B` groups inside one `Connectors`
+ * group on top of subgraphs and nodes. Needs the edge-label frames, so it runs last.
+ */
+const connectorsStep: DiagramStep = {
+  name: 'connectors',
+  run: (rootNode) => {
+    arrangeFlowchart(rootNode)
+  },
+}
+
 /** Per-diagram-type steps, executed in order between the initial purge and the generic cleanup. */
-export const DIAGRAM_STEPS: DiagramStep[] = [erdStep, flowchartStep, edgeLabelStep]
+export const DIAGRAM_STEPS: DiagramStep[] = [erdStep, flowchartStep, edgeLabelStep, connectorsStep]
 
 /**
  * Figma imports the SVG root as a frame whose white fill is not shown (canvas shows through),

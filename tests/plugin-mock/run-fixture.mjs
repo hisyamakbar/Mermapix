@@ -16,6 +16,9 @@ export const THEMES = {
   light: { primaryColor: '#f8fafc', primaryTextColor: '#09090b', primaryBorderColor: '#e4e4e7', lineColor: '#e4e4e7', background: '#ffffff', edgeLabelBackground: '#ffffff', attributeBackgroundColorOdd: '#ffffff', attributeBackgroundColorEven: '#fafafa' },
 }
 export const EXAMPLES = ['1-ex-erd', '2-ex-flowchart', '3-ex-sequence', '4-ex-sitemap']
+// Flowchart-type fixtures (Phase 8.3): the two built-in examples + the nested-subgraph edge-case fixture
+// (tests/figma-fixtures/07-flowchart-nested-subgraphs.mmd).
+export const FLOW_EXAMPLES = ['2-ex-flowchart', '4-ex-sitemap', '7-case-nested-subgraphs']
 
 export const fixturePath = (example, theme) => path.join(FIXTURE_DIR, `${example}${theme === 'light' ? '-light' : ''}.svg`)
 

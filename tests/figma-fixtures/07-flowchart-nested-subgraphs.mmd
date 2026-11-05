@@ -1,0 +1,31 @@
+flowchart TD
+  user(["User request"]) --> gateway{"Auth check?"}
+  gateway -->|valid| api
+  gateway -->|denied| reject["Reject request"]
+
+  subgraph BACKEND["Backend"]
+    api["API server"] --> svc
+
+    subgraph SERVICES["Services"]
+      svc[["Order service"]] --> store[("Orders DB")]
+      svc --> queue["Job queue"]
+    end
+
+    subgraph WORKERS["Workers"]
+      worker["Email worker"]
+      cron{{"Nightly cron"}}
+    end
+
+    queue -->|dequeue| worker
+  end
+
+  subgraph MONITORING["Monitoring"]
+    logs["Log collector"] --> dash["Dashboard"]
+  end
+
+  SERVICES --> MONITORING
+  worker -.-> logs
+  reject --> dash
+
+  classDef danger fill:#fde2e2,stroke:#c0392b,color:#4a1111,stroke-width:2px
+  class reject danger

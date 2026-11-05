@@ -73,7 +73,10 @@ export function dissolveRedundantWrappers(parent: any): void {
         name.includes('subgraph') ||
         name.includes('cluster') ||
         name.includes('inlined-marker') ||
-        name.includes('marker')
+        name.includes('marker') ||
+        // Phase 8.3 structure: edge groups may hold a single line and must stay a group
+        name.startsWith('edge: ') ||
+        name === 'connectors'
 
       // Dissolve if it's a generic wrapper OR a single-child group that isn't a protected node
       if ((isGeneric || isSingleChild) && !isProtectedNode) {
@@ -132,6 +135,23 @@ export function unwrapRootGroup(rootNode: any): void {
   }
 }
 
+/** Unnamed vectors/groups inside a named marker group become "Marker Path" (no leftover "Vector"). */
+function nameMarkerParts(marker: any): void {
+  if (!marker || !('children' in marker)) return
+  const base = 'Marker Path'
+  const visit = (n: any): void => {
+    for (const c of [...(n.children || [])]) {
+      if (!c || c.removed) continue
+      if (c.type === 'VECTOR' && (!c.name || c.name === 'Vector')) c.name = base
+      else if (c.type === 'GROUP' && (!c.name || c.name === 'Group')) {
+        c.name = base
+        visit(c)
+      }
+    }
+  }
+  visit(marker)
+}
+
 /** Pass 5: final sweep to clean remaining layer names and label connectors & markers. */
 export function finalClean(n: any): void {
   if (!n || n.removed) return
@@ -139,6 +159,7 @@ export function finalClean(n: any): void {
 
   if (name.includes('inlined-marker')) {
     n.name = markerLayerName(n.name)
+    nameMarkerParts(n)
   } else if (n.type === 'TEXT') {
     const preview = (n.characters || '').trim().replace(/\s+/g, ' ')
     if (!n.name || n.name === 'Text' || n.name === 'Group') {

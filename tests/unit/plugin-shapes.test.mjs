@@ -74,17 +74,16 @@ for (const theme of THEME_NAMES) {
       for (const k of 'rgb') assert.ok(near(root.fills[0].color[k], want[k], 1e-6), `${k}`)
     })
 
-    test(`[${example}/${theme}] connectors (L_* / id_entity edges) are untouched`, async () => {
+    test(`[${example}/${theme}] connectors (L_* / id_entity edges) keep path + bounds (8.3 renames flowchart lines to "Line")`, async () => {
       const { before, root } = await load(example, theme)
       const edges = (tree) => all(tree, (n) => n.type === 'VECTOR' && /(^|-)L_|id_entity|cyclic-special/.test(n.name))
-      const b = edges(before), a = edges(root)
-      assert.equal(a.length, b.length)
+      const b = edges(before)
+      const lines = all(root, (n) => n.type === 'VECTOR' && (/id_entity|cyclic-special/.test(n.name) || n.name === 'Line'))
+      assert.equal(lines.length, b.length)
       for (const e of b) {
-        const m = a.find((x) => x.name === e.name)
+        const bb = rel(e, before)
+        const m = lines.find((x) => x.vectorPaths[0].data === e.vectorPaths[0].data && ['x', 'y', 'width', 'height'].every((k) => near(bb[k], rel(x, root)[k], 0.01)))
         assert.ok(m, e.name)
-        assert.equal(m.vectorPaths[0].data, e.vectorPaths[0].data, e.name)
-        const bb = rel(e, before), ab = rel(m, root)
-        for (const k of ['x', 'y', 'width', 'height']) assert.ok(near(bb[k], ab[k], 0.01), `${e.name} ${k}`)
       }
     })
 
@@ -160,11 +159,15 @@ for (const theme of THEME_NAMES) {
         assert.deepEqual(dupes, [])
       })
 
-      test(`[${example}/${theme}] layer order of nodes is preserved`, async () => {
+      test(`[${example}/${theme}] relative layer order of nodes is preserved within each parent`, async () => {
         const { before, root } = await load(example, theme)
         const ids = all(before, (n) => n.type === 'GROUP' && NODE_RE.test(n.name)).map((n) => NODE_RE.exec(n.name)[1])
         const after = nodeFrames(root).map((f) => f.pluginData['mermapix:node'])
-        assert.deepEqual(after, ids)
+        assert.deepEqual([...after].sort(), [...ids].sort())
+        for (const parent of all(root, (n) => n.children && n.children.some((c) => c.pluginData && c.pluginData['mermapix:node'] !== undefined))) {
+          const order = parent.children.filter((c) => c.pluginData && c.pluginData['mermapix:node'] !== undefined).map((c) => ids.indexOf(c.pluginData['mermapix:node']))
+          assert.deepEqual(order, [...order].sort((a, c) => a - c), `${parent.name}`)
+        }
       })
     }
 

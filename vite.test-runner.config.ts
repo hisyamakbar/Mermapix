@@ -13,6 +13,8 @@ export default defineConfig({
     },
   },
   build: {
+    // ui.html is a single file: inline every asset (the self-hosted woff2 fonts) as a data URL.
+    assetsInlineLimit: 1024 * 1024,
     outDir: 'dist-test-runner',
     emptyOutDir: true,
     rollupOptions: {

@@ -10,6 +10,9 @@
 [![Contrast: audited](https://img.shields.io/badge/Contrast-WCAG_AA_audited-cyan.svg)](tests/color-audit.mjs)
 [![Version](https://img.shields.io/badge/version-1.1.0-ec4899.svg)](CHANGELOG.md)
 
+> [!NOTE]
+> **The Figma plugin is in review on Figma Community.** Until it is approved you can already use it: download `mermapix-figma-plugin-v1.1.0.zip` from the [latest release](https://github.com/hisyamakbar/Mermapix/releases/latest) and import it in Figma Desktop (see [Running the Figma Plugin Locally](#-running-the-figma-plugin-locally)). The web app needs no install.
+
 ---
 
 ## 🌟 What is Mermapix?
@@ -88,10 +91,15 @@ After changing `plugin/src/`, `src/export/`, `src/themes/`, `src/plugin/` or `sr
 
 ## 🔌 Running the Figma Plugin Locally
 
-1. Open **Figma Desktop**.
-2. Right click on any canvas > **Plugins** > **Development** > **Import plugin from manifest...**.
-3. Select `plugin/manifest.json`.
-4. Click **Run** or open `plugin/PUBLISHING_GUIDE.md` for full Figma Community publishing instructions.
+The plugin is waiting for Figma Community review. Until it is listed there, run it as a development plugin (it is the same build that was submitted, no build step needed):
+
+1. Download `mermapix-figma-plugin-v1.1.0.zip` from the [latest release](https://github.com/hisyamakbar/Mermapix/releases/latest) and unzip it (or clone this repository and use the `plugin/` folder).
+2. Open **Figma Desktop** (development plugins do not run in the browser).
+3. Open a design file, then **Plugins** > **Development** > **Import plugin from manifest...**.
+4. Select `manifest.json` from the unzipped folder (or `plugin/manifest.json` in the repository).
+5. Run it from **Plugins** > **Development** > **Mermapix**: paste Mermaid code (or pick an example) and click **Insert**.
+
+The plugin works fully offline; nothing is sent anywhere. Maintainers: `plugin/PUBLISHING_GUIDE.md` covers the Community publishing steps.
 
 **Regression pass in real Figma**: import `plugin-dev/manifest.json` (Mermapix Test Runner, developer only) and click **Run all**. It inserts every `tests/figma-fixtures/*.mmd` in light and dark on a new page and stores an audit you can read back with `tests/figma-read-audit.js` (see `tests/README.md`).
 

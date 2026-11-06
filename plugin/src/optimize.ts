@@ -8,7 +8,8 @@
 //   4. elevateSequenceNumbers
 //   5. unwrapRootGroup
 //   6. finalClean            - semantic layer naming
-//   7. applyRootBackground   - theme background on the root frame
+//   7. growRootToFitContent  - safety net: the root frame never crops its content (Phase 10.1)
+//   8. applyRootBackground   - theme background on the root frame
 //
 // To add a diagram type, create `plugin/src/<type>.ts` exporting a DiagramStep
 // and register it in DIAGRAM_STEPS below. Steps run in array order.
@@ -32,6 +33,7 @@ import {
   elevateSequenceNumbers,
   unwrapRootGroup,
   finalClean,
+  growRootToFitContent,
 } from './cleanup.ts'
 
 export interface StepContext {
@@ -193,5 +195,6 @@ export function optimizeDiagramNodes(rootNode: any, themeVariables?: Record<stri
   elevateSequenceNumbers(rootNode)
   unwrapRootGroup(rootNode)
   finalClean(rootNode)
+  growRootToFitContent(rootNode)
   applyRootBackground(rootNode, themeVariables)
 }

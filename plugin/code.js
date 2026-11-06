@@ -4817,6 +4817,91 @@
 			for (const child of [...n.children]) if (child && !child.removed) finalClean(child);
 		} catch (_unused10) {}
 	}
+	/** Export margins (px) kept around content when the root frame has to grow: left, top, right, bottom. */
+	var ROOT_MARGIN = {
+		left: 24,
+		top: 16,
+		right: 12,
+		bottom: 12
+	};
+	/** Overflow below this is rounding noise, not a crop. */
+	var ROOT_OVERFLOW_TOLERANCE = .5;
+	/**
+	* Bounds of everything the root frame is supposed to show, in root coordinates. GROUPs are coordinate
+	* transparent (Figma keeps their children in the parent frame's space); a nested FRAME contributes its
+	* own bounds and is entered only when it does not clip (a clipping frame hides its overflow by design) and
+	* does not use Auto Layout (Figma positions those children itself, their stored x/y mean nothing).
+	*/
+	function collectContentBoxes(parent, ox, oy, out) {
+		if (!parent || !("children" in parent) || !Array.isArray(parent.children)) return;
+		for (const child of parent.children) {
+			if (!child || child.removed || child.visible === false) continue;
+			const x = ox + (child.x || 0);
+			const y = oy + (child.y || 0);
+			const w = child.width || 0;
+			const h = child.height || 0;
+			if (child.type === "GROUP") {
+				collectContentBoxes(child, ox, oy, out);
+				continue;
+			}
+			if (w > 0 || h > 0) out.push({
+				x0: x,
+				y0: y,
+				x1: x + w,
+				y1: y + h
+			});
+			const autoLayout = child.layoutMode && child.layoutMode !== "NONE";
+			if (child.type === "FRAME" && child.clipsContent === false && !autoLayout) collectContentBoxes(child, x, y, out);
+		}
+	}
+	/**
+	* Safety net (Phase 10.1): the root frame must never crop its content. The export pads Mermaid's viewBox,
+	* but font substitution (Inter text is wider than the Arial the importer measures with), a converter or a
+	* future Mermaid change can still push a layer past the frame. When that happens the frame grows (and is
+	* shifted, with every child moved the other way so nothing moves on screen) until the content fits with
+	* at least the export margins on the sides that grew. A layer lying entirely outside the frame is Mermaid
+	* clipping on purpose (gantt's today marker far outside the chart range) and is ignored. Returns whether
+	* the frame changed.
+	*/
+	function growRootToFitContent(rootNode) {
+		if (!rootNode || rootNode.type !== "FRAME" || rootNode.removed) return false;
+		const width = rootNode.width;
+		const height = rootNode.height;
+		if (!(width > 0) || !(height > 0)) return false;
+		const boxes = [];
+		collectContentBoxes(rootNode, 0, 0, boxes);
+		let x0 = Infinity;
+		let y0 = Infinity;
+		let x1 = -Infinity;
+		let y1 = -Infinity;
+		for (const b of boxes) {
+			if (b.x1 <= 0 || b.x0 >= width || b.y1 <= 0 || b.y0 >= height) continue;
+			x0 = Math.min(x0, b.x0);
+			y0 = Math.min(y0, b.y0);
+			x1 = Math.max(x1, b.x1);
+			y1 = Math.max(y1, b.y1);
+		}
+		if (x0 === Infinity) return false;
+		const left = -x0 > ROOT_OVERFLOW_TOLERANCE ? Math.ceil(-x0 + ROOT_MARGIN.left) : 0;
+		const top = -y0 > ROOT_OVERFLOW_TOLERANCE ? Math.ceil(-y0 + ROOT_MARGIN.top) : 0;
+		const right = x1 - width > ROOT_OVERFLOW_TOLERANCE ? Math.ceil(x1 - width + ROOT_MARGIN.right) : 0;
+		const bottom = y1 - height > ROOT_OVERFLOW_TOLERANCE ? Math.ceil(y1 - height + ROOT_MARGIN.bottom) : 0;
+		if (!left && !top && !right && !bottom) return false;
+		try {
+			if (left || top) {
+				for (const child of [...rootNode.children]) {
+					child.x = (child.x || 0) + left;
+					child.y = (child.y || 0) + top;
+				}
+				rootNode.x = (rootNode.x || 0) - left;
+				rootNode.y = (rootNode.y || 0) - top;
+			}
+			rootNode.resize(width + left + right, height + top + bottom);
+		} catch (_unused11) {
+			return false;
+		}
+		return true;
+	}
 	/** Per-diagram-type steps, executed in order between the initial purge and the generic cleanup. */
 	var DIAGRAM_STEPS = [
 		{
@@ -4924,6 +5009,7 @@
 		elevateSequenceNumbers(rootNode);
 		unwrapRootGroup(rootNode);
 		finalClean(rootNode);
+		growRootToFitContent(rootNode);
 		applyRootBackground(rootNode, themeVariables);
 	}
 	//#endregion

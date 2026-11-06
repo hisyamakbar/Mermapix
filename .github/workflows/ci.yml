@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: false
 
       - uses: pnpm/action-setup@v4
         with:
@@ -39,8 +41,9 @@ jobs:
 
       - name: Committed plugin bundles are up to date
         run: |
-          if ! git diff --quiet -- plugin plugin-dev tests/figma-audit.js; then
-            git diff --stat -- plugin plugin-dev tests/figma-audit.js
+          BUNDLES="plugin/code.js plugin/ui.html plugin-dev/code.js plugin-dev/ui.html tests/figma-audit.js"
+          if ! git diff --quiet -- $BUNDLES; then
+            git diff --stat -- $BUNDLES
             echo "::error::Run 'pnpm build:plugin' and 'pnpm build:test-runner' and commit the outputs."
             exit 1
           fi

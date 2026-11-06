@@ -5094,9 +5094,15 @@
 			node.y = Math.round(center.y - node.height / 2);
 			figma.currentPage.selection = [node];
 			figma.viewport.scrollAndZoomIntoView([node]);
-			figma.notify("✓ Mermapix diagram added to canvas with clean Auto Layout layers!");
+			figma.notify("Mermapix diagram added to canvas");
+			figma.ui.postMessage({ type: "inserted" });
 		} catch (err) {
-			figma.notify("Failed to create diagram: " + (err instanceof Error ? err.message : String(err)), { error: true });
+			const message = err instanceof Error ? err.message : String(err);
+			figma.notify("Could not create the diagram: " + message, { error: true });
+			figma.ui.postMessage({
+				type: "insert-failed",
+				message
+			});
 		}
 		else if (msg.type === "resize" && msg.width && msg.height) figma.ui.resize(Math.round(msg.width), Math.round(msg.height));
 		else if (msg.type === "close") figma.closePlugin();

@@ -147,8 +147,31 @@ export default function AppPlugin() {
     }
   }, [theme])
 
+  // The sandbox (plugin/src/main.ts) confirms each insert, so the button never claims
+  // success for an insert that failed on the canvas side.
+  useEffect(() => {
+    let timer: number | undefined
+    const onMessage = (event: MessageEvent) => {
+      const msg = event.data?.pluginMessage
+      if (!msg) return
+      if (msg.type === 'inserted') {
+        setInserted(true)
+        window.clearTimeout(timer)
+        timer = window.setTimeout(() => setInserted(false), 2000)
+      } else if (msg.type === 'insert-failed') {
+        setInserted(false)
+      }
+    }
+    window.addEventListener('message', onMessage)
+    return () => {
+      window.removeEventListener('message', onMessage)
+      window.clearTimeout(timer)
+    }
+  }, [])
+
   // Insert editable layers into Figma Canvas
   const handleInsertIntoCanvas = () => {
+    if (error) return
     const built = buildExportSvg(diagramRef.current)
     if (!built) return
 
@@ -166,9 +189,7 @@ export default function AppPlugin() {
         },
         '*',
       )
-
-      setInserted(true)
-      window.setTimeout(() => setInserted(false), 2000)
+      // "Added!" is shown when the sandbox replies with `inserted` (see the effect above).
     } catch {
       // Fallback: Copy to clipboard if postMessage unavailable
       copyToFigma(diagramRef.current)
@@ -220,7 +241,8 @@ export default function AppPlugin() {
       <Toolbar
         theme={theme}
         onToggleTheme={() => setTheme((val) => (val === 'light' ? 'dark' : 'light'))}
-        hasSvg={Boolean(svg)}
+        // A syntax error leaves the last good preview in place: never insert that stale diagram.
+        hasSvg={Boolean(svg) && !error}
         copied={inserted}
         onCopyToFigma={handleInsertIntoCanvas}
         onExportSvg={handleExportSvg}

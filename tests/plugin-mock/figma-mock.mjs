@@ -93,7 +93,7 @@ export async function runPlugin(codePath, svg, buildScene, extraMsg = {}) {
   let svgSeen = null
   const figma = {
     showUI: (...a) => log.push(['showUI', a]),
-    ui: { set onmessage(f) { handler = f }, resize: (...a) => log.push(['ui.resize', a]) },
+    ui: { set onmessage(f) { handler = f }, resize: (...a) => log.push(['ui.resize', a]), postMessage: (m) => log.push(['ui.postMessage', m]) },
     loadFontAsync: async (f) => { log.push(['font', f]) },
     createNodeFromSvg: (s) => { svgSeen = s; root = buildScene(env, s); return root },
     createFrame: () => new MockNode(env, 'FRAME'),

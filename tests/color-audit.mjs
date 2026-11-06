@@ -133,11 +133,14 @@ async function waitFor(cdp, expression, timeout = 15000) {
 
 // Runs inside the page. Everything is computed in the root <svg> user space so the
 // canvas zoom/pan never matters.
+// `visibility` too: Mermaid styles some labels with id-scoped `fill: … !important` rules
+// (gantt `#mermaid-svg-N .activeText0`), which beat a class-scoped `fill: transparent
+// !important` and left the glyphs in the backdrop screenshot (false failures).
 const HIDE_TEXT_ID = "color-audit-hide-text"
 const PAGE_HIDE_TEXT = `(() => {
   const style = document.createElement('style')
   style.id = ${JSON.stringify(HIDE_TEXT_ID)}
-  style.textContent = '.diagram-stage svg text, .diagram-stage svg tspan { fill: transparent !important; stroke: none !important; text-shadow: none !important } .diagram-stage svg foreignObject, .diagram-stage svg foreignObject * { color: transparent !important; text-shadow: none !important }'
+  style.textContent = '.diagram-stage svg text, .diagram-stage svg tspan { visibility: hidden !important; fill: transparent !important; stroke: none !important; text-shadow: none !important } .diagram-stage svg foreignObject, .diagram-stage svg foreignObject * { color: transparent !important; text-shadow: none !important }'
   document.head.appendChild(style)
   return true
 })()`
@@ -412,7 +415,7 @@ const PAGE_MOUNT_EXPORT = `((svgText, bg, hideText) => {
   if (hideText) {
     const style = document.createElement('style')
     style.id = 'export-hide'
-    style.textContent = '#export-host svg text, #export-host svg tspan { fill: transparent !important; stroke: none !important }'
+    style.textContent = '#export-host svg text, #export-host svg tspan { visibility: hidden !important; fill: transparent !important; stroke: none !important }'
     document.head.appendChild(style)
   }
   const r = host.firstElementChild.getBoundingClientRect()

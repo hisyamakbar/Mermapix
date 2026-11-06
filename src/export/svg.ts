@@ -153,6 +153,40 @@ export function padViewBoxAxis(min: number, size: number, pad: number): { min: n
   return { min, size }
 }
 
+// Some shapes are only transformed by CSS, e.g. gantt milestones get their diamond
+// from `.milestone { transform: rotate(45deg) scale(0.8) }` plus a `transform-origin`
+// attribute. The export drops <style> and Figma ignores `transform-origin`, so the
+// milestone landed as an upright square. Bake the element's effective local
+// transform (CSS transform + origin, read back from the live CTMs) into a plain
+// `transform` matrix. Elements that already carry a `transform` attribute are left
+// alone: their computed transform is that attribute, which Figma already reads.
+function bakeCssTransform(
+  element: SVGElement,
+  target: SVGElement,
+  computed: CSSStyleDeclaration,
+  sourceRoot: SVGSVGElement,
+) {
+  if (element === sourceRoot || element.hasAttribute('transform')) return
+  if (!computed.transform || computed.transform === 'none') return
+  if (!(element instanceof SVGGraphicsElement)) return
+  const parent = element.parentElement
+  if (!(parent instanceof SVGGraphicsElement)) return
+  const own = element.getCTM()
+  const base = parent.getCTM()
+  if (!own || !base) return
+  const local = base.inverse().multiply(own)
+  const isIdentity =
+    Math.abs(local.a - 1) < 1e-6 && Math.abs(local.b) < 1e-6 && Math.abs(local.c) < 1e-6 &&
+    Math.abs(local.d - 1) < 1e-6 && Math.abs(local.e) < 1e-6 && Math.abs(local.f) < 1e-6
+  if (isIdentity) return
+  const r = (v: number) => Math.round(v * 1e6) / 1e6
+  target.setAttribute(
+    'transform',
+    `matrix(${r(local.a)} ${r(local.b)} ${r(local.c)} ${r(local.d)} ${r(local.e)} ${r(local.f)})`,
+  )
+  target.removeAttribute('transform-origin')
+}
+
 export function buildExportSvg(
   diagramContainer: HTMLElement | null,
 ): { serialized: string; width: number; height: number } | null {
@@ -199,6 +233,8 @@ export function buildExportSvg(
         target.setAttribute(property, value)
       }
     })
+
+    bakeCssTransform(element, target, computed, sourceRoot)
 
     if (element instanceof SVGTextElement && target instanceof SVGTextElement) {
       // Mermaid lays out labels with nested <tspan>s using em-relative y/dy

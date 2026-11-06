@@ -90,8 +90,9 @@ test('an exact payload is left alone: root size equals the exported viewBox', as
 
 test('layers wholly outside the frame are Mermaid clipping them on purpose (gantt today marker) and do not grow it', async () => {
   const svg = zlib.gunzipSync(fs.readFileSync(path.join(FIXTURE_DIR, 'survey', 'gantt-light.svg.gz'))).toString('utf8')
-  const [, , w, h] = viewBoxOf(svg)
-  assert.ok(/x1="8\d{3}"/.test(svg), 'the payload has the far-away today line')
+  const [minX, , w, h] = viewBoxOf(svg)
+  const farX = Math.max(...[...svg.matchAll(/x1="([\d.]+)"/g)].map((m) => Number(m[1])))
+  assert.ok(farX > minX + w + 1000, 'the payload has the far-away today line')
   const { root } = await runSvg(svg, 'light')
   assert.equal(root.width, w)
   assert.equal(root.height, h)

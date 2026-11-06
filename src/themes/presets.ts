@@ -403,5 +403,12 @@ export function initMermaid(theme: Theme = 'dark') {
       curve: 'basis',
       padding: 20,
     },
+    // Gantt sizes itself to its container's width at render time, so the same code
+    // came out 500px wide in the plugin window (labels pushed outside the bars, axis
+    // dates crowded) and 1600px on a wide screen. A fixed width makes web and plugin
+    // output identical and gives bars room for their labels.
+    gantt: {
+      useWidth: 1200,
+    },
   })
 }

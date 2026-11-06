@@ -25,6 +25,134 @@ export const SVG_PRESENTATION_PROPERTIES = [
   'paint-order',
 ] as const
 
+// Elements Mermaid hides itself with `display: none` (for example the treemap root
+// section value). `display` is not inherited, so a descendant's own `none` is
+// Mermaid's choice and not the host UI's: those elements are dropped from the export
+// instead of becoming visible in Figma. Only painted graphics and containers qualify;
+// <defs> content, <style>, <title> and friends have a UA `display: none` and stay.
+const HIDDEN_DROPPABLE_TAGS = new Set([
+  'g', 'rect', 'circle', 'ellipse', 'line', 'path', 'polygon', 'polyline',
+  'text', 'tspan', 'image', 'use', 'a', 'switch', 'foreignObject',
+])
+const NON_RENDERED_CONTAINERS = 'defs, clipPath, mask, marker, pattern, symbol, linearGradient, radialGradient'
+
+const SVG_NS = 'http://www.w3.org/2000/svg'
+
+function parseCssColor(value: string): { rgb: string; alpha: number } | null {
+  const match = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+%?))?\s*\)/.exec(value)
+  if (!match) return null
+  const raw = match[4]
+  const alpha = raw === undefined ? 1 : raw.endsWith('%') ? parseFloat(raw) / 100 : parseFloat(raw)
+  return { rgb: `rgb(${match[1]}, ${match[2]}, ${match[3]})`, alpha }
+}
+
+let baselineProbe: CanvasRenderingContext2D | null | undefined
+function fontAscent(computed: CSSStyleDeclaration, fallback: number): number {
+  if (baselineProbe === undefined) {
+    baselineProbe = document.createElement('canvas').getContext('2d')
+  }
+  if (!baselineProbe) return fallback
+  baselineProbe.font = `${computed.fontStyle} ${computed.fontWeight} ${computed.fontSize} ${computed.fontFamily}`
+  const ascent = baselineProbe.measureText('Hg').fontBoundingBoxAscent
+  return Number.isFinite(ascent) && ascent > 0 ? ascent : fallback
+}
+
+// Mermaid's eventmodeling renders card labels as <foreignObject><div><span><b>..
+// even with htmlLabels:false, and Figma ignores foreignObject. Rebuild each label as a
+// <text> with flat, absolute <tspan> rows (the same shape the rest of the export uses)
+// from where the browser actually drew every character, in the foreignObject's own
+// user space so the surrounding transforms apply as before.
+function convertForeignObjectLabels(sourceRoot: SVGSVGElement, exportedRoot: SVGSVGElement) {
+  const sources = Array.from(sourceRoot.querySelectorAll('foreignObject'))
+  const targets = Array.from(exportedRoot.querySelectorAll('foreignObject'))
+  sources.forEach((source, index) => {
+    const target = targets[index]
+    // <switch> (journey) already carries a <text> fallback: do not duplicate it.
+    if (!target || !target.parentNode || source.closest('switch')) return
+    if (window.getComputedStyle(source).display === 'none') return
+    const matrix = source.getScreenCTM()
+    if (!matrix) return
+    const inverse = matrix.inverse()
+
+    const walker = document.createTreeWalker(source, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const value = node.textContent ?? ''
+      const owner = node.parentElement
+      if (!owner || !value.trim()) continue
+      const computed = window.getComputedStyle(owner)
+      if (computed.visibility === 'hidden') continue
+
+      // Group characters into visual lines by their drawn vertical position.
+      const lines: { chars: { ch: string; rect: DOMRect }[] }[] = []
+      const range = document.createRange()
+      for (let i = 0; i < value.length; i++) {
+        range.setStart(node, i)
+        range.setEnd(node, i + 1)
+        const rect = range.getClientRects()[0]
+        if (!rect || (rect.width === 0 && rect.height === 0)) continue // collapsed whitespace
+        const line = lines[lines.length - 1]
+        const first = line?.chars[0].rect
+        if (line && first && Math.abs(rect.top - first.top) <= Math.max(1, first.height * 0.5)) {
+          line.chars.push({ ch: value[i], rect })
+        } else {
+          lines.push({ chars: [{ ch: value[i], rect }] })
+        }
+      }
+
+      const fontSize = parseFloat(computed.fontSize) || 13
+      const color = parseCssColor(computed.color)
+      const fill = color?.rgb ?? 'rgb(0, 0, 0)'
+      const rows: { text: string; x: number; y: number }[] = []
+      lines.forEach((line) => {
+        const start = line.chars.findIndex((c) => c.ch.trim())
+        if (start < 0) return
+        const chars = line.chars.slice(start)
+        const text = chars.map((c) => c.ch).join('').replace(/\s+/g, ' ').trimEnd()
+        if (!text) return
+        const local = new DOMPoint(chars[0].rect.left, chars[0].rect.top).matrixTransform(inverse)
+        const ascent = fontAscent(computed, fontSize * 0.8)
+        rows.push({ text, x: local.x, y: local.y + ascent })
+      })
+      if (!rows.length) continue
+
+      const label = document.createElementNS(SVG_NS, 'text')
+      label.setAttribute('text-anchor', 'start')
+      label.setAttribute('fill', fill)
+      if (color && color.alpha < 1) label.setAttribute('fill-opacity', `${color.alpha}`)
+      label.setAttribute('stroke', 'none')
+      label.setAttribute('visibility', 'visible')
+      label.setAttribute('font-family', 'Arial, sans-serif')
+      label.setAttribute('font-size', `${fontSize}`)
+      label.setAttribute('font-weight', computed.fontWeight || '400')
+      if (computed.fontStyle && computed.fontStyle !== 'normal') {
+        label.setAttribute('font-style', computed.fontStyle)
+      }
+      rows.forEach((row) => {
+        const tspan = document.createElementNS(SVG_NS, 'tspan')
+        tspan.setAttribute('x', `${row.x}`)
+        tspan.setAttribute('y', `${row.y}`)
+        tspan.setAttribute('fill', fill)
+        tspan.setAttribute('stroke', 'none')
+        tspan.textContent = row.text
+        label.appendChild(tspan)
+      })
+      target.parentNode.insertBefore(label, target)
+    }
+  })
+}
+
+/**
+ * Pads one axis of Mermaid's viewBox (`min`, `size`) with `pad` (24 left / 16 top) before and 12 after.
+ * A positive origin is padded around its own origin so the far side widens too (the old code only moved
+ * the box). An origin in (-pad, 0] keeps the old convention (box anchored at -pad, widened by
+ * `pad - min + 12`; identical output for 0), and one already beyond -pad is left as Mermaid drew it.
+ */
+export function padViewBoxAxis(min: number, size: number, pad: number): { min: number; size: number } {
+  if (min > 0) return { min: min - pad, size: size + pad + 12 }
+  if (min > -pad) return { min: -pad, size: size + (pad - min) + 12 }
+  return { min, size }
+}
+
 export function buildExportSvg(
   diagramContainer: HTMLElement | null,
 ): { serialized: string; width: number; height: number } | null {
@@ -40,9 +168,18 @@ export function buildExportSvg(
     ...Array.from(exportedRoot.querySelectorAll<SVGElement>('*')),
   ]
 
+  const hiddenByDiagram: SVGElement[] = []
   sourceElements.forEach((element, index) => {
     const target = exportedElements[index]
     const computed = window.getComputedStyle(element)
+    if (
+      element !== sourceRoot &&
+      computed.display === 'none' &&
+      HIDDEN_DROPPABLE_TAGS.has(element.tagName) &&
+      !element.closest(NON_RENDERED_CONTAINERS)
+    ) {
+      hiddenByDiagram.push(target)
+    }
     SVG_PRESENTATION_PROPERTIES.forEach((property) => {
       const value = computed.getPropertyValue(property)
       if (value) {
@@ -189,6 +326,9 @@ export function buildExportSvg(
     target.removeAttribute('alignment-baseline')
   })
 
+  // Must run before anything is removed: it pairs source and exported foreignObjects by index.
+  convertForeignObjectLabels(sourceRoot, exportedRoot)
+  hiddenByDiagram.forEach((element) => element.remove())
   exportedRoot.querySelectorAll('style').forEach((style) => style.remove())
   exportedRoot.querySelectorAll('foreignObject').forEach((element) => element.remove())
   exportedRoot.querySelectorAll('g').forEach((g) => {
@@ -203,18 +343,20 @@ export function buildExportSvg(
   let width = parseFloat(widthStr)
   let height = parseFloat(heightStr)
 
-  // Ensure minimum breathing room on the left edge so actor text (e.g. stick-figure Customer)
-  // or leftmost elements are never clipped by the frame boundary.
-  if (minX > -24) {
-    const padLeft = 24 - minX
-    minX = -24
-    width += padLeft + 12
-  }
-  if (minY > -16) {
-    const padTop = 16 - minY
-    minY = -16
-    height += padTop + 12
-  }
+  // Margins around Mermaid's own viewBox: at least 24px left, 16px top, 12px right and
+  // bottom (actor text such as the stick-figure Customer must never touch the frame
+  // edge), and never a smaller box. The old code only handled an origin at or below 0
+  // (it moved the box to -24/-16 and widened it by `24 - origin + 12`); with a positive
+  // origin (treemap 2,27; kanban 90,-310; timeline 100,-57; mindmap 5,5) the box moved
+  // out but did not widen, which cropped the right/bottom. A positive origin is now
+  // padded around its own origin. An origin of 0 or below keeps the old result exactly
+  // (`-24 -16 (w+36) (h+28)` for 0), as does a box already starting beyond the margin.
+  const paddedX = padViewBoxAxis(minX, width, 24)
+  const paddedY = padViewBoxAxis(minY, height, 16)
+  minX = paddedX.min
+  width = paddedX.size
+  minY = paddedY.min
+  height = paddedY.size
 
   exportedRoot.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
   exportedRoot.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink')

@@ -15,9 +15,11 @@ const EXAMPLE = '37-case-treemap'
 const all = (tree, pred) => { const out = []; walk(tree, (n, p) => pred(n, p) && out.push(n)); return out }
 const near = (a, b, tol = 1) => Math.abs(a - b) <= tol
 
-const SECTIONS = ['Treemap', 'Monthly Budget', 'Housing', 'Savings', 'Food', 'Transport']
+// Phase 10.1: Mermaid's hidden (`display:none`) unnamed root section is no longer exported, so
+// `Monthly Budget` is the outermost section.
+const SECTIONS = ['Monthly Budget', 'Housing', 'Savings', 'Food', 'Transport']
 const LEAVES = ['Rent', 'Utilities', 'Internet', 'Retirement', 'Emergency fund', 'Groceries', 'Dining out', 'Car payment', 'Fuel']
-const PARENT_OF = { 'Monthly Budget': 'Treemap', Housing: 'Monthly Budget', Savings: 'Monthly Budget', Food: 'Monthly Budget', Transport: 'Monthly Budget', Rent: 'Housing', Utilities: 'Housing', Internet: 'Housing', Retirement: 'Savings', 'Emergency fund': 'Savings', Groceries: 'Food', 'Dining out': 'Food', 'Car payment': 'Transport', Fuel: 'Transport' }
+const PARENT_OF = { Housing: 'Monthly Budget', Savings: 'Monthly Budget', Food: 'Monthly Budget', Transport: 'Monthly Budget', Rent: 'Housing', Utilities: 'Housing', Internet: 'Housing', Retirement: 'Savings', 'Emergency fund': 'Savings', Groceries: 'Food', 'Dining out': 'Food', 'Car payment': 'Transport', Fuel: 'Transport' }
 
 const runs = new Map()
 async function load(theme) {
@@ -35,7 +37,8 @@ const sameColor = (c, rgb) => c && Math.abs(c.r - rgb[0]) < 0.003 && Math.abs(c.
 const textColoredBlocks = (tree, rgb) => all(tree, (n) => (n.type === 'VECTOR' || n.type === 'FRAME') && n.width >= 10 && n.fills && n.fills.length > 0 && n.fills[0].visible !== false && n.fills[0].opacity === 1 && sameColor(n.fills[0].color, rgb) && !(n.strokes && n.strokes.length))
 
 const sectionFrame = (root, name) => all(root, (n) => n.type === 'FRAME' && n.name.startsWith(`Section: ${name} (`))[0]
-const leafFrame = (root, name) => all(root, (n) => n.type === 'FRAME' && n.name.startsWith(`Leaf: ${name} (`))[0]
+// Mermaid hides the value of a leaf that is too small to show it (display:none, e.g. `Fuel`): no `($…)` suffix then.
+const leafFrame = (root, name) => all(root, (n) => n.type === 'FRAME' && (n.name === `Leaf: ${name}` || n.name.startsWith(`Leaf: ${name} (`)))[0]
 const nodeFrame = (root, name) => sectionFrame(root, name) || leafFrame(root, name)
 
 /** Ground truth rects of the original import: every painted section / leaf rect (clip groups and 25px header strips excluded). */
@@ -88,7 +91,7 @@ for (const theme of THEMES) {
     }
     // paint of the original rect (fill opacity folded in by the importer) is on the frame
     const boxes = originalBoxes(original)
-    assert.equal(boxes.length, 15)
+    assert.equal(boxes.length, 14)
     for (const { vec, b } of boxes) {
       const f = all(root, (n) => n.type === 'FRAME' && /^(Section|Leaf): /.test(n.name)).find((n) => {
         const r = relBounds(n, root)
@@ -106,7 +109,7 @@ for (const theme of THEMES) {
   test(`[treemap/${theme}] bounds (1px), names and nesting follow Mermaid's layout`, async () => {
     const { root, original } = await load(theme)
     const frames = all(root, (n) => n.type === 'FRAME' && /^(Section|Leaf): /.test(n.name))
-    assert.equal(frames.length, 15)
+    assert.equal(frames.length, 14)
     for (const { b } of originalBoxes(original)) {
       const hit = frames.filter((n) => { const r = relBounds(n, root); return near(r.x, b.x) && near(r.y, b.y) && near(r.width, b.width) && near(r.height, b.height) })
       assert.equal(hit.length, 1, `exactly one frame at ${JSON.stringify(b)}`)
@@ -122,7 +125,8 @@ for (const theme of THEMES) {
       const c = nodeFrame(root, child)
       assert.equal(titleOf(c.parent), parent, `${child} sits in ${parent}`)
     }
-    assert.equal(sectionFrame(root, 'Treemap').parent, root, 'the unnamed root container is the outer frame')
+    assert.equal(sectionFrame(root, 'Monthly Budget').parent, root, 'the outermost visible section is the outer frame')
+    assert.equal(sectionFrame(root, 'Treemap'), undefined, 'the hidden unnamed root section is not exported')
     // every section: header first, then nested frames (headers never overlap children)
     for (const name of SECTIONS) {
       const s = sectionFrame(root, name)
@@ -136,7 +140,7 @@ for (const theme of THEMES) {
     const sig = (t) => `${t.characters.trim()}|${t.fontSize}`
     const before = all(original, (n) => n.type === 'TEXT' && n.characters.trim()).map(sig).sort()
     const after = all(root, (n) => n.type === 'TEXT' && n.characters.trim()).map(sig).sort()
-    assert.equal(before.length, 29)
+    assert.equal(before.length, 27)
     assert.deepEqual(after, before)
     assert.equal(all(root, (n) => n.type === 'TEXT' && !n.characters.trim()).length, 0)
 
@@ -159,7 +163,7 @@ for (const theme of THEMES) {
       const leaf = leafFrame(root, name)
       const lb = relBounds(leaf, root)
       const kids = layoutAuto(leaf)
-      assert.equal(kids.length, 2, `${name}: label + value`)
+      assert.equal(kids.length, name === 'Fuel' ? 1 : 2, `${name}: label + value (Fuel's value is hidden by Mermaid)`)
       for (const { node, x, y } of kids) {
         const cy = lb.y + y + node.height / 2
         const cx = lb.x + x + node.width / 2

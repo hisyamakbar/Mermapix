@@ -16,6 +16,15 @@
 //
 // Lines and outlines inside gridlines / panels / dashed elements also only warn.
 //
+// Phase 10.1 adds two more sources of text:
+//   html    text inside <foreignObject> (eventmodeling cards): colour = computed CSS
+//           `color`, backdrop = pixels of the text-hidden screenshot. <switch>
+//           fallbacks are skipped (their <text> is audited as svg text).
+//   export  every <text> of the file the real "SVG" export button produces
+//           (buildExportSvg), mounted at 1:1 on the diagram background with its text
+//           hidden for the backdrop screenshot. Catches labels that the export drops
+//           or recolours.
+//
 // Usage:
 //   node tests/color-audit.mjs --label after --out <dir>
 //   node tests/color-audit.mjs --only 37,38 --themes dark
@@ -128,7 +137,7 @@ const HIDE_TEXT_ID = "color-audit-hide-text"
 const PAGE_HIDE_TEXT = `(() => {
   const style = document.createElement('style')
   style.id = ${JSON.stringify(HIDE_TEXT_ID)}
-  style.textContent = '.diagram-stage svg text, .diagram-stage svg tspan { fill: transparent !important; stroke: none !important; text-shadow: none !important }'
+  style.textContent = '.diagram-stage svg text, .diagram-stage svg tspan { fill: transparent !important; stroke: none !important; text-shadow: none !important } .diagram-stage svg foreignObject, .diagram-stage svg foreignObject * { color: transparent !important; text-shadow: none !important }'
   document.head.appendChild(style)
   return true
 })()`
@@ -268,6 +277,43 @@ const PAGE_AUDIT = `(async (bgHex, shotB64) => {
     })
   }
 
+  // --- html labels (foreignObject) ---
+  report.html = []
+  for (const fo of svg.querySelectorAll('foreignObject')) {
+    if (fo.closest('switch') || inDefs(fo) || hidden(fo)) continue
+    const walker = document.createTreeWalker(fo, NodeFilter.SHOW_TEXT)
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const content = n.textContent.replace(/\\s+/g, ' ').trim()
+      if (!content || !n.parentElement) continue
+      const s = getComputedStyle(n.parentElement)
+      const range = document.createRange()
+      range.selectNodeContents(n)
+      const r = range.getBoundingClientRect()
+      if (!r.width || !r.height) continue
+      // The text colour is hidden in the screenshot, so read it from the page's own
+      // palette: the audit style is gone by now, so s.color is the real colour.
+      const fill = parse(s.color)
+      if (!fill) continue
+      const cx = r.x + r.width / 2, cy = r.y + r.height / 2
+      const samples = []
+      for (const dy of [-0.25, 0, 0.25]) for (const dx of [-0.25, 0, 0.25]) {
+        const px = pixel(cx + dx * r.width, cy + dy * r.height)
+        if (px) samples.push(px)
+      }
+      if (samples.length < 9) { report.unsampled++; continue }
+      samples.sort((a, b) => lum(a) - lum(b))
+      const under = samples[4]
+      const fg = over(fill, under, fill.a)
+      const size = parseFloat(s.fontSize)
+      const bold = parseInt(s.fontWeight, 10) >= 700 || s.fontWeight === 'bold'
+      const large = size >= 18 || (bold && size >= 14)
+      report.html.push({
+        text: content.slice(0, 40), fg: hex(fg), bg: hex(under), ratio: +ratio(fg, under).toFixed(2),
+        need: large ? 3 : 4.5, size, bold, cls: 'foreignObject',
+      })
+    }
+  }
+
   // --- strokes ---
   for (const s of painted) {
     if (!s.stroke) continue
@@ -293,6 +339,97 @@ const PAGE_AUDIT = `(async (bgHex, shotB64) => {
   report.type = svg.getAttribute('aria-roledescription') || null
   return report
 })`
+
+// Runs on a page that contains ONLY the exported SVG mounted at (0,0) 1:1 (see
+// PAGE_MOUNT_EXPORT), with a screenshot of it taken while all text was hidden.
+const PAGE_AUDIT_EXPORT = `(async (shotB64) => {
+  const svg = document.querySelector('#export-host svg')
+  if (!svg) return { error: 'no exported svg' }
+  const parse = (value) => {
+    const m = /rgba?\\(\\s*([\\d.]+)[,\\s]+([\\d.]+)[,\\s]+([\\d.]+)(?:[,\\s/]+([\\d.]+%?))?/.exec(value || '')
+    if (!m) return null
+    const a = m[4] === undefined ? 1 : m[4].endsWith('%') ? parseFloat(m[4]) / 100 : parseFloat(m[4])
+    return { r: +m[1], g: +m[2], b: +m[3], a }
+  }
+  const hex = (c) => '#' + [c.r, c.g, c.b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')
+  const over = (top, under, alpha) => ({ r: top.r * alpha + under.r * (1 - alpha), g: top.g * alpha + under.g * (1 - alpha), b: top.b * alpha + under.b * (1 - alpha) })
+  const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b) }
+  const ratio = (a, b) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05) }
+  const bmp = await createImageBitmap(await (await fetch('data:image/png;base64,' + shotB64)).blob())
+  const canvas = document.createElement('canvas')
+  canvas.width = bmp.width; canvas.height = bmp.height
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  ctx.drawImage(bmp, 0, 0)
+  const vb = svg.getAttribute('viewBox').trim().split(/[ ,]+/).map(Number)
+  const r0 = svg.getBoundingClientRect()
+  const pixel = (x, y) => {
+    const px = Math.round(x - r0.left), py = Math.round(y - r0.top)
+    if (px < 0 || py < 0 || px >= bmp.width || py >= bmp.height) return null
+    const d = ctx.getImageData(px, py, 1, 1).data
+    return { r: d[0], g: d[1], b: d[2] }
+  }
+  const out = { texts: [], unsampled: 0, fo: svg.querySelectorAll('foreignObject').length }
+  for (const t of svg.querySelectorAll('text')) {
+    if (t.closest('defs, clipPath, marker, mask, symbol, pattern')) continue
+    const s = getComputedStyle(t)
+    if (s.display === 'none') continue
+    const content = t.textContent.replace(/\\s+/g, ' ').trim()
+    if (!content) continue
+    const tsp = t.querySelector('tspan')
+    const fill = parse((tsp ? getComputedStyle(tsp) : s).fill)
+    if (!fill) continue
+    const alpha = fill.a * parseFloat(s.fillOpacity || '1')
+    const r = t.getBoundingClientRect()
+    if (!r.width || !r.height) continue
+    const cx = r.x + r.width / 2, cy = r.y + r.height / 2
+    const samples = []
+    for (const dy of [-0.25, 0, 0.25]) for (const dx of [-0.25, 0, 0.25]) { const px = pixel(cx + dx * r.width, cy + dy * r.height); if (px) samples.push(px) }
+    if (samples.length < 9) { out.unsampled++; continue }
+    samples.sort((a, b) => lum(a) - lum(b))
+    const under = samples[4]
+    const fg = over(fill, under, alpha)
+    const size = parseFloat(s.fontSize)
+    const bold = parseInt(s.fontWeight, 10) >= 700 || s.fontWeight === 'bold'
+    const large = size >= 18 || (bold && size >= 14)
+    out.texts.push({ text: content.slice(0, 40), fg: hex(fg), bg: hex(under), ratio: +ratio(fg, under).toFixed(2), need: large ? 3 : 4.5, size, bold, cls: 'export' })
+  }
+  return out
+})`
+
+// Replaces the page with the exported SVG at (0,0), 1:1, on the diagram background.
+const PAGE_MOUNT_EXPORT = `((svgText, bg, hideText) => {
+  document.head.querySelectorAll('style#export-hide').forEach((n) => n.remove())
+  document.body.innerHTML = ''
+  document.documentElement.style.background = bg
+  document.body.style.cssText = 'margin:0;background:' + bg
+  const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml')
+  if (doc.querySelector('parsererror')) return { error: 'xml parse error' }
+  const host = document.createElement('div')
+  host.id = 'export-host'
+  host.style.cssText = 'position:absolute;left:0;top:0;line-height:0'
+  host.appendChild(document.importNode(doc.documentElement, true))
+  document.body.appendChild(host)
+  if (hideText) {
+    const style = document.createElement('style')
+    style.id = 'export-hide'
+    style.textContent = '#export-host svg text, #export-host svg tspan { fill: transparent !important; stroke: none !important }'
+    document.head.appendChild(style)
+  }
+  const r = host.firstElementChild.getBoundingClientRect()
+  return { x: 0, y: 0, width: r.width, height: r.height }
+})`
+
+// Clicks the real "SVG" export button and returns the produced file's text.
+const PAGE_CAPTURE_EXPORT = `(async () => {
+  const original = URL.createObjectURL
+  let captured = null
+  URL.createObjectURL = (blob) => { captured = blob; return original.call(URL, blob) }
+  const button = [...document.querySelectorAll('button')].find((b) => b.textContent.trim().endsWith('SVG'))
+  if (!button) return null
+  button.click()
+  URL.createObjectURL = original
+  return captured ? await captured.text() : null
+})()`
 
 async function renderFixture(cdp, code, theme) {
   await cdp.send("Page.navigate", { url: appUrl })
@@ -338,7 +475,11 @@ try {
       row.texts = rep.texts.length
       row.unsampled = rep.unsampled
       row.lines = rep.lines.length
+      row.html = rep.html.length
       for (const t of rep.texts) {
+        if (t.ratio < t.need) row.failures.push({ kind: "text", ...t })
+      }
+      for (const t of rep.html) {
         if (t.ratio < t.need) row.failures.push({ kind: "text", ...t })
       }
       for (const l of rep.lines) {
@@ -351,6 +492,31 @@ try {
         const box = await evaluate(cdp, `(() => { const r = document.querySelector('.diagram-stage').parentElement.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height } })()`)
         const { data } = await cdp.send("Page.captureScreenshot", { format: "png", clip: { ...box, scale: 1 } })
         await writeFile(path.join(shotsDir, `${label}-${name}-${theme}.png`), Buffer.from(data, "base64"))
+      }
+      // Exported SVG text (what Figma receives). Must run last: it replaces the page.
+      const svgText = await evaluate(cdp, PAGE_CAPTURE_EXPORT)
+      row.exportTexts = 0
+      if (!svgText) {
+        row.failures.push({ kind: "text", text: "(SVG export produced no file)", fg: "-", bg: "-", ratio: 0, need: 4.5, size: 0, cls: "export" })
+      } else {
+        const box = await evaluate(cdp, `${PAGE_MOUNT_EXPORT}(${JSON.stringify(svgText)}, ${JSON.stringify(BACKGROUNDS[theme])}, true)`)
+        if (box.error) row.failures.push({ kind: "text", text: `(${box.error})`, fg: "-", bg: "-", ratio: 0, need: 4.5, size: 0, cls: "export" })
+        else {
+          await sleep(80)
+          // The viewport must be at least as large as the SVG or the backdrop is cut at 1440x900.
+          await cdp.send("Emulation.setDeviceMetricsOverride", { width: Math.max(100, Math.ceil(box.width)), height: Math.max(100, Math.ceil(box.height)), deviceScaleFactor: 1, mobile: false })
+          await sleep(100)
+          const { data: exShot } = await cdp.send("Page.captureScreenshot", { format: "png", clip: { ...box, scale: 1 } })
+          await cdp.send("Emulation.clearDeviceMetricsOverride")
+          await evaluate(cdp, `${PAGE_MOUNT_EXPORT}(${JSON.stringify(svgText)}, ${JSON.stringify(BACKGROUNDS[theme])}, false)`)
+          const ex = await evaluate(cdp, `${PAGE_AUDIT_EXPORT}(${JSON.stringify(exShot)})`)
+          if (ex.error) row.failures.push({ kind: "text", text: `(${ex.error})`, fg: "-", bg: "-", ratio: 0, need: 4.5, size: 0, cls: "export" })
+          else {
+            row.exportTexts = ex.texts.length
+            for (const t of ex.texts) if (t.ratio < t.need) row.failures.push({ kind: "text", ...t })
+            if (ex.fo) row.failures.push({ kind: "text", text: `(${ex.fo} foreignObject left in export)`, fg: "-", bg: "-", ratio: 0, need: 4.5, size: 0, cls: "export" })
+          }
+        }
       }
       results.push(row)
       process.stderr.write(`${name} ${theme}: ${row.failures.length} fail, ${row.warnings.length} warn\n`)
@@ -368,7 +534,8 @@ const pad = (s, n) => String(s).padEnd(n)
 lines.push(`Mermapix colour audit (${label}), themes: ${themes.join(", ")}`)
 lines.push("fail = text < 4.5:1 (3:1 large) or unfilled line < 3:1; warn = card outline / grid / dashed < 3:1")
 lines.push("")
-lines.push(pad("fixture", 36) + themes.map((t) => pad(`${t} fail/warn (texts,lines)`, 30)).join(""))
+lines.push("columns: (svg texts, lines, html label texts 'h', exported svg texts 'x')")
+lines.push(pad("fixture", 36) + themes.map((t) => pad(`${t} fail/warn`, 30)).join(""))
 const totals = Object.fromEntries(themes.map((t) => [t, { fail: 0, warn: 0 }]))
 const byName = new Map()
 for (const r of results) {
@@ -383,7 +550,7 @@ for (const [name, perTheme] of byName) {
     if (r.renderError && !r.texts) { line += pad(`ERROR ${r.renderError.slice(0, 20)}`, 30); continue }
     totals[theme].fail += r.failures.length
     totals[theme].warn += r.warnings.length
-    line += pad(`${r.failures.length} / ${r.warnings.length}  (${r.texts},${r.lines}${r.unsampled ? `,${r.unsampled} unsampled` : ""})`, 30)
+    line += pad(`${r.failures.length} / ${r.warnings.length}  (${r.texts},${r.lines},${r.html ?? 0}h,${r.exportTexts ?? 0}x${r.unsampled ? `,${r.unsampled} unsampled` : ""})`, 30)
   }
   lines.push(line)
 }
@@ -394,14 +561,14 @@ lines.push("Failures (grouped by fixture, theme, foreground on background):")
 for (const r of results) {
   const groups = new Map()
   for (const f of r.failures) {
-    const key = `${f.kind} ${f.fg} on ${f.bg} ${f.ratio}:1 (need ${f.need})`
+    const key = `${f.kind}${f.cls === "export" ? "(export)" : f.cls === "foreignObject" ? "(html)" : ""} ${f.fg} on ${f.bg} ${f.ratio}:1 (need ${f.need})`
     const g = groups.get(key) ?? { n: 0, sample: f }
     g.n++
     groups.set(key, g)
   }
   for (const [key, g] of groups) {
     const s = g.sample
-    const what = s.kind === "text" ? `"${s.text}" ${s.size}px` : `${s.tag} .${s.cls}`
+    const what = s.kind === "text" ? `"${s.text}" ${s.size}px${s.cls === "export" || s.cls === "foreignObject" ? ` [${s.cls}]` : ""}` : `${s.tag} .${s.cls}`
     lines.push(`  ${r.fixture} [${r.theme}] x${g.n} ${key}  e.g. ${what}`)
   }
 }

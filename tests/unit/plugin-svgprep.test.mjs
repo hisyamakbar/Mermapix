@@ -108,10 +108,10 @@ test('stripLabelClipPaths handles several clipPaths, an unreferenced one, and id
   assert.ok(out.includes('<clipPath id="keep">') && out.includes('<g clip-path="url(#keep)"/>'))
 })
 
-test('the treemap payload loses all 15 clipPaths and 24 references; prepareSvgForFigma applies it', () => {
+test('the treemap payload loses all 15 clipPaths and 22 references; prepareSvgForFigma applies it', () => {
   const raw = read('../fixtures/plugin/37-case-treemap-light.svg')
   assert.equal(count(raw, /<clipPath /g), 15)
-  assert.equal(count(raw, /clip-path=/g), 24)
+  assert.equal(count(raw, /clip-path=/g), 22)
   const out = stripLabelClipPaths(raw)
   assert.equal(count(out, /<clipPath|clip-path=/g), 0)
   assert.equal(count(out, /<rect /g), count(raw, /<rect /g) - 15)

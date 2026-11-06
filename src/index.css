@@ -1188,6 +1188,13 @@ button, a {
   overflow: visible;
 }
 
+/* HTML labels that Mermaid still emits inside <foreignObject> (eventmodeling cards,
+   journey) have no theme variable: they inherit the CSS text colour, which must follow
+   the diagram theme (presets textColor) instead of the app chrome's light text. Scoped
+   to foreignObject so the `color` captured on every other exported element is unchanged. */
+.mpx-app[data-theme="light"] .diagram-stage svg foreignObject { color: #09090b; }
+.mpx-app[data-theme="dark"] .diagram-stage svg foreignObject { color: #f8fafc; }
+
 .canvas-hint,
 .loading {
   position: absolute;

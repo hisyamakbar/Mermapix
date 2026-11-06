@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Web build
+        run: pnpm build
+
+      - name: Plugin and test-runner bundles
+        run: |
+          pnpm build:plugin
+          pnpm build:test-runner
+
+      - name: Committed plugin bundles are up to date
+        run: |
+          if ! git diff --quiet -- plugin plugin-dev tests/figma-audit.js; then
+            git diff --stat -- plugin plugin-dev tests/figma-audit.js
+            echo "::error::Run 'pnpm build:plugin' and 'pnpm build:test-runner' and commit the outputs."
+            exit 1
+          fi
+
+      - name: Unit and mock-Figma plugin tests
+        run: pnpm test:unit

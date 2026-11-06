@@ -1,0 +1,61 @@
+name: Diagram does not convert cleanly
+description: A Mermaid diagram looks wrong, loses text, or is not tidy after landing in Figma.
+title: "[diagram] <diagram type>: <what looks wrong>"
+labels: ["diagram-conversion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! The Mermaid code plus a screenshot of the Figma result is usually all we need to reproduce it.
+  - type: textarea
+    id: code
+    attributes:
+      label: Mermaid code
+      description: The smallest code that shows the problem.
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: route
+    attributes:
+      label: How did you insert it?
+      options:
+        - Figma plugin (Insert)
+        - Web app, Copy to Figma (paste)
+        - Web app, SVG / PNG download
+    validations:
+      required: true
+  - type: dropdown
+    id: theme
+    attributes:
+      label: Theme
+      options:
+        - Light
+        - Dark
+        - Both
+    validations:
+      required: true
+  - type: checkboxes
+    id: symptoms
+    attributes:
+      label: What is wrong?
+      options:
+        - label: Text missing or unreadable
+        - label: Frame too small / content cut off
+        - label: Shape and its outline are separate layers, or a shape is not a frame
+        - label: Wrong colors (compared with the preview)
+        - label: Elements moved or overlapping
+        - label: Layer names are generic (Vector / Group)
+        - label: Something else (describe below)
+  - type: textarea
+    id: details
+    attributes:
+      label: Details and screenshots
+      description: Screenshot of the Figma result next to the Mermapix preview. A link to a Figma file helps too.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Mermapix version
+      description: Shown in the About dialog (e.g. v1.1.0).

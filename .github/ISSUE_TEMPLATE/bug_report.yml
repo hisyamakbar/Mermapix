@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in the web app or the plugin UI does not work (editor, import, export, theme, layout).
+title: "[bug] <short description>"
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Paste ...
+        3. Click ...
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Web app
+        - Figma plugin (Figma Design)
+        - Figma plugin (FigJam)
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Browser / OS / Figma version
+  - type: input
+    id: version
+    attributes:
+      label: Mermapix version
+      description: Shown in the About dialog (e.g. v1.1.0).
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots, console errors, input code

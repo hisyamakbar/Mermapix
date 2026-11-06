@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Mermaid syntax help
+    url: https://mermaid.js.org/intro/syntax-reference.html
+    about: Questions about Mermaid syntax itself belong to the Mermaid docs and community.
+  - name: Security vulnerability
+    url: https://github.com/hisyamakbar/Mermapix/security/advisories/new
+    about: Please report security issues privately, not as a public issue.

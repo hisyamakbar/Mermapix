@@ -109,6 +109,9 @@ Mermapix/
 │   └── research-competitors.md     # Market and technical competitor research
 ├── package.json                    # Dependencies, version and scripts (build, build:plugin, build:test-runner, test:unit, test:export, test:colors)
 ├── CHANGELOG.md                    # Release notes
+├── CONTRIBUTING.md                 # Contributor guide (setup, pipeline rules, fixture workflow)
+├── CODE_OF_CONDUCT.md / SECURITY.md # Contributor Covenant 2.1, private vulnerability reporting
+├── .github/                        # Issue templates (diagram conversion, bug, feature), PR template, CI workflow
 ├── tsconfig.json                   # TypeScript configuration
 ├── vite.config.ts                  # Standard Vite config with React and Tailwind v4
 └── LICENSE                         # MIT License

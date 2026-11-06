@@ -19,6 +19,7 @@ All notable changes to Mermapix are documented here. The format follows
 - **Developer test runner** (`plugin-dev/`, not published): inserts every fixture in light and dark into one Figma page and writes an audit the maintainers read back.
 - Contrast audit (`pnpm test:colors`), exported-fixture viewBox check (`tests/export-fixtures.mjs`) and a mock Figma harness that runs the real plugin bundle in unit tests.
 - "Report an issue" link and a privacy note in the About dialog.
+- Contributor guide (`CONTRIBUTING.md`), Code of Conduct, security policy, GitHub issue templates (diagram conversion, bug, feature), PR template and a CI workflow (types, builds, stale-bundle check, tests).
 - New brand icon set (favicon, PWA icons, logo lockups, plugin icon, social preview, community cover).
 
 ### Fixed

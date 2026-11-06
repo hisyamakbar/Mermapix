@@ -5,7 +5,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Figma Plugin: 100% Offline](https://img.shields.io/badge/Figma_Plugin-100%25_Offline-10b981.svg)](plugin/manifest.json)
-[![Tests: Passing](https://img.shields.io/badge/Tests-Passing-success.svg)](tests/)
+[![CI](https://github.com/hisyamakbar/Mermapix/actions/workflows/ci.yml/badge.svg)](https://github.com/hisyamakbar/Mermapix/actions/workflows/ci.yml)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-ec4899.svg)](CONTRIBUTING.md)
 [![Contrast: audited](https://img.shields.io/badge/Contrast-WCAG_AA_audited-cyan.svg)](tests/color-audit.mjs)
 [![Version](https://img.shields.io/badge/version-1.1.0-ec4899.svg)](CHANGELOG.md)
 
@@ -99,7 +100,8 @@ After changing `plugin/src/`, `src/export/`, `src/themes/`, `src/plugin/` or `sr
 ## 🐛 Support, Issues & Contributing
 
 - Found a diagram that does not convert cleanly? [Open an issue](https://github.com/hisyamakbar/Mermapix/issues) with the Mermaid code, the theme (light/dark) and a screenshot of the Figma result.
-- Pull requests are welcome. Please read [`AGENTS.md`](AGENTS.md) first (architecture and the rules that keep the export pipeline intact), add the failing case as a fixture in `tests/figma-fixtures/`, and run `pnpm test:unit`.
+- Pull requests are welcome! [`CONTRIBUTING.md`](CONTRIBUTING.md) covers the setup, how the web and plugin pipelines fit together, the rules that keep the export intact, and the fixture → failing test → fix workflow. Issue templates guide you through a good report; CI checks types, builds and tests on every PR.
+- Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md). Security issues: see [`SECURITY.md`](SECURITY.md) (private reporting, no public issues).
 - Release notes: [`CHANGELOG.md`](CHANGELOG.md).
 
 **Privacy**: Mermapix collects no data. Diagrams are rendered and converted locally, in your browser or inside Figma.

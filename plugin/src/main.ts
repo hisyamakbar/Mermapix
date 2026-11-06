@@ -2,10 +2,9 @@
 // Receives SVG from ui.html, inlines missing SVG markers (crow's foot, arrows),
 // and creates native vector/text nodes on canvas with column-based Auto Layout.
 // Bundled with all ./*.ts modules into plugin/code.js by scripts/build-plugin.mjs.
+// The conversion itself lives in ./diagram.ts (shared with the developer test runner).
 
-import { prepareSvgForFigma } from './svgPrep.ts'
-import { optimizeDiagramNodes } from './optimize.ts'
-import { diagramTypeFromSvg } from './genericGeometry.ts'
+import { createDiagramNode, loadDiagramFonts } from './diagram.ts'
 
 figma.showUI(__html__, {
   width: 500,
@@ -24,48 +23,12 @@ figma.ui.onmessage = async (msg: {
 }) => {
   if (msg.type === 'create-svg' && msg.svg) {
     try {
-      // Preload standard fonts asynchronously so text metrics and property operations never fail
-      try {
-        const fonts = [
-          { family: 'Inter', style: 'Regular' },
-          { family: 'Inter', style: 'Medium' },
-          { family: 'Inter', style: 'Semi Bold' },
-          { family: 'Inter', style: 'Bold' },
-          { family: 'Inter', style: 'Italic' },
-          { family: 'Inter', style: 'Bold Italic' },
-          { family: 'Arial', style: 'Regular' },
-          { family: 'Arial', style: 'Bold' },
-        ]
-        // One missing style must not block the others.
-        await Promise.all(fonts.map((f) => figma.loadFontAsync(f).catch(() => {})))
-      } catch (fontErr) {
-        // Non-blocking fallback if custom style unavailable
-      }
-
-      // Inline SVG markers only if the UI did not already (avoids stacked duplicates), then give
-      // each inlined marker group a unique id so Figma names the layer (it ignores `class`).
-      const processedSvg = prepareSvgForFigma(msg.svg)
-      const node = figma.createNodeFromSvg(processedSvg)
-      node.name = msg.name || 'Mermapix Diagram'
-
-      function ensureAllLayersVisible(n: any): void {
-        if (!n || n.removed) return
-        try {
-          n.visible = true
-        } catch {}
-        if ('children' in n && Array.isArray(n.children)) {
-          for (const child of n.children) {
-            ensureAllLayersVisible(child)
-          }
-        }
-      }
-      ensureAllLayersVisible(node)
-
-      figma.currentPage.appendChild(node)
-
-      // Optimize layers: convert ERD tables to column-based Auto Layout & dissolve redundant groups
-      optimizeDiagramNodes(node, msg.themeVariables, diagramTypeFromSvg(msg.svg))
-      ensureAllLayersVisible(node)
+      await loadDiagramFonts()
+      const node = createDiagramNode({
+        svg: msg.svg,
+        name: msg.name,
+        themeVariables: msg.themeVariables,
+      })
 
       // Center in current user viewport
       const center = figma.viewport.center

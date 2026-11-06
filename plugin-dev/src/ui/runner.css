@@ -1,0 +1,167 @@
+/* Mermapix Test Runner UI (developer-only). Loaded after src/index.css. */
+.tr-root {
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  font-size: 12px;
+  color: #e2e8f0;
+  background: #0a0f16;
+  overflow: hidden;
+}
+.tr-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tr-head h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.tr-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: #7c2d12;
+  color: #fed7aa;
+}
+.tr-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.tr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  color: #94a3b8;
+}
+.tr-theme {
+  flex: 0 0 170px;
+}
+.tr-field input,
+.tr-field select {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #111827;
+  color: #e2e8f0;
+  font: inherit;
+}
+.tr-btn {
+  height: 30px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 6px;
+  font-weight: 600;
+  color: #fff;
+  background: #2563eb;
+  cursor: pointer;
+}
+.tr-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.tr-btn-secondary {
+  background: #475569;
+}
+.tr-hint {
+  margin: 0;
+  color: #94a3b8;
+}
+.tr-hint code {
+  user-select: all;
+  color: #cbd5e1;
+}
+.tr-status {
+  margin: 0;
+  font-weight: 600;
+  color: #86efac;
+}
+.tr-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #94a3b8;
+}
+.tr-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: #1e293b;
+  overflow: hidden;
+}
+.tr-bar-fill {
+  height: 100%;
+  background: #38bdf8;
+  transition: width 0.15s ease;
+}
+.tr-results {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tr-results-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tr-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+}
+.tr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.tr-table th {
+  position: sticky;
+  top: 0;
+  background: #111827;
+  text-align: right;
+  padding: 5px 8px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+.tr-table th:first-child,
+.tr-table td:first-child {
+  text-align: left;
+}
+.tr-table td {
+  padding: 4px 8px;
+  text-align: right;
+  border-top: 1px solid #1e293b;
+}
+.tr-table tbody tr {
+  cursor: pointer;
+}
+.tr-table tbody tr:hover {
+  background: #162033;
+}
+.tr-bad {
+  color: #fca5a5;
+  font-weight: 700;
+}
+.tr-row-fail td:first-child {
+  color: #fca5a5;
+}
+.tr-row-warn td:first-child {
+  color: #fcd34d;
+}
+.tr-err {
+  font-size: 10px;
+  color: #f87171;
+  white-space: normal;
+}

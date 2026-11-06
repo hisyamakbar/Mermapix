@@ -54,7 +54,7 @@ Mermapix/
 │   ├── hooks/
 │   │   └── useCanvasZoom.ts        # Canvas zoom/pan gesture handlers and fit-to-view math
 │   ├── themes/
-│   │   └── presets.ts              # WCAG AAA theme variables (light/dark) and Mermaid initialization
+│   │   └── presets.ts              # Theme variables (light/dark, contrast-audited), categorical palette, railroad colors, Mermaid initialization
 │   ├── types/
 │   │   └── index.ts                # Global type contracts (Theme, ZoomState, TableNaming)
 │   ├── utils/
@@ -108,7 +108,8 @@ Mermapix/
 ├── plans/                          # Project plans and decision archives
 │   ├── mermapix-plan.md            # Roadmap, phase checklist, and architectural rules
 │   └── research-competitors.md     # Market and technical competitor research
-├── package.json                    # Dependencies and scripts (build, dev, test:unit, test:export)
+├── package.json                    # Dependencies, version and scripts (build, build:plugin, build:test-runner, test:unit, test:export, test:colors)
+├── CHANGELOG.md                    # Release notes
 ├── tsconfig.json                   # TypeScript configuration
 ├── vite.config.ts                  # Standard Vite config with React and Tailwind v4
 └── LICENSE                         # MIT License

@@ -12,7 +12,9 @@ const read = (rel) => fs.readFileSync(path.resolve(here, rel), 'utf8')
 const count = (s, re) => (s.match(re) || []).length
 
 test('ensureMarkersInlined inlines once and is idempotent (no double inlining)', () => {
-  const raw = read('../baseline/erd-basic.svg')
+  // A Mermaid ERD export from before marker inlining existed (the old Phase 0 baseline),
+  // kept as a fixture so this test does not depend on the refreshable tests/baseline/.
+  const raw = read('../fixtures/plugin/raw-erd-not-inlined.svg')
   assert.equal(count(raw, /inlined-marker /g), 0)
   const once = ensureMarkersInlined(raw)
   const n = count(once, /<g class="inlined-marker /g)

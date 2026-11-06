@@ -1,6 +1,9 @@
 import { useRef, useEffect } from 'react'
-import { X, ExternalLink, ShieldCheck, Heart, Sparkles } from 'lucide-react'
+import { X, ExternalLink, ShieldCheck, Heart, Sparkles, MessageCircleWarning } from 'lucide-react'
 import GithubIcon from './GithubIcon.tsx'
+import { version } from '../../package.json'
+
+const ISSUES_URL = 'https://github.com/hisyamakbar/Mermapix/issues'
 
 export interface AboutModalProps {
   isOpen: boolean
@@ -85,7 +88,7 @@ export default function AboutModal({ isOpen, onClose }: AboutModalProps) {
                   fontWeight: 600,
                 }}
               >
-                v1.0.2
+                v{version}
               </span>
             </div>
             <p className="modal-desc">
@@ -195,6 +198,35 @@ export default function AboutModal({ isOpen, onClose }: AboutModalProps) {
             <span>Star &amp; View on GitHub</span>
             <ExternalLink size={12} style={{ opacity: 0.6 }} />
           </a>
+
+          <a
+            href={ISSUES_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="action-btn action-btn-secondary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              width: '100%',
+              padding: '8px 14px',
+              borderRadius: 'var(--radius-sm)',
+              textDecoration: 'none',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--btn-text)',
+            }}
+          >
+            <MessageCircleWarning size={15} aria-hidden="true" />
+            <span>Report an issue or get support</span>
+            <ExternalLink size={12} style={{ opacity: 0.6 }} />
+          </a>
+
+          <p style={{ margin: 0, fontSize: '11px', lineHeight: 1.5, color: 'var(--muted)' }}>
+            <strong>Privacy:</strong> Mermapix collects no data. Your diagrams are rendered and
+            converted locally; no network requests are made.
+          </p>
         </div>
 
         <p

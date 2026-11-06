@@ -369,7 +369,7 @@ async function main() {
   <div class="glow"></div>
 
   <header>
-    <div class="badge">✦ Native Figma Plugin</div>
+    <div class="badge">✦ Plugin for Figma</div>
     <div class="brand-row">
       <img class="logo-icon" src="${iconDataUrl}" alt="">
       <h1>Mermapix</h1>
@@ -489,7 +489,7 @@ async function main() {
     <div class="feature-item"><div class="feature-dot"></div> DBML & SQL Importer</div>
     <div class="feature-item"><div class="feature-dot"></div> 100% Offline & Private</div>
     <div class="feature-item"><div class="feature-dot"></div> Light & Dark Sync</div>
-    <div class="feature-item"><div class="feature-dot"></div> Flowchart & Sequence</div>
+    <div class="feature-item"><div class="feature-dot"></div> 30+ Mermaid Diagram Types</div>
   </div>
 </body>
 </html>`

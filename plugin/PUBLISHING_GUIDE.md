@@ -90,7 +90,7 @@ Unlike standard converters that flatten diagrams into non-editable raster images
 - 🏗️ **Native Auto Layout ERD Frames**: Tables and entities are converted directly into vertical Auto Layout frames. Add or remove fields and the container card responds automatically!
 - 🧼 **Clean Layers (Zero Group Clutter)**: Redundant wrapper groups are dissolved so you can double-click and edit text instantly.
 - 🗄️ **DBML & SQL Schema Import**: Paste raw DBML or SQL `CREATE TABLE` definitions (Postgres/MySQL) and convert them directly to Mermaid ERDs.
-- 🎨 **Light & Dark Theme Sync**: Fully WCAG AAA compliant contrast presets for clean light documentation or midnight cyan presentations.
+- 🎨 **Light & Dark Theme Sync**: Contrast-audited (WCAG AA) light and midnight-cyan dark presets with a 12-color palette for charts and maps.
 - ⚡ **100% Offline & Private**: Zero network requests (`allowedDomains: ["none"]`). Your proprietary database schemas never leave your machine.
 - 🧩 **FigJam & Figma Design**: Seamlessly insert diagrams into design files or whiteboards.
 

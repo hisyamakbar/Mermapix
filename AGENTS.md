@@ -47,7 +47,8 @@ Mermapix/
 │   │   ├── types.ts                # AST definitions for schemas, tables, and relations
 │   │   └── index.ts                # Converter barrel export
 │   ├── assets/
-│   │   └── mermapix-icon-96.webp   # 96px brand icon, inlined as base64 so it works in the single-file plugin UI
+│   │   ├── mermapix-icon-96.webp   # 96px brand icon, inlined as base64 so it works in the single-file plugin UI
+│   │   └── fonts/                  # Self-hosted Inter + JetBrains Mono woff2 (SIL OFL), no Google Fonts request
 │   ├── export/
 │   │   └── svg.ts                  # SVG normalization, foreignObject removal, Figma layer preparation
 │   ├── hooks/
@@ -115,12 +116,14 @@ Mermapix/
 
 ## Critical Invariants & Rules for Agents (DO NOT VIOLATE)
 
-1. **Protect the SVG Export Pipeline**: Never modify `buildExportSvg`, `copyToFigma`, or presentation properties in `src/export/svg.ts`, nor `htmlLabels: false` in `src/themes/presets.ts`. This pipeline ensures text nodes export with absolute `<tspan>` positioning so Figma renders editable text layers rather than flat outlines.
+1. **Protect the SVG Export Pipeline**: `buildExportSvg` / `copyToFigma` in `src/export/svg.ts` and `htmlLabels: false` in `src/themes/presets.ts` are the core of the product. Never change the computed-style capture (`SVG_PRESENTATION_PROPERTIES`), the rewrite of every `<text>` into flat, absolutely positioned `<tspan>` rows (this is what makes Figma import editable text instead of outlines), or `htmlLabels: false`. Any other change to `svg.ts` needs the user's explicit approval for that specific bug and must be re-verified on every `tests/figma-fixtures/*.mmd` (`node tests/export-fixtures.mjs`). Approved so far (2026-11-06, see `plans/mermapix-plan.md` Phase 10): viewBox padding for any origin (`padViewBoxAxis`), `<foreignObject>` labels converted to `<text>` (`convertForeignObjectLabels`), elements Mermaid hides with `display:none` are dropped, CSS-only transforms baked into `transform=matrix()` (`bakeCssTransform`).
 2. **Plugin Auto Layout Engine**: In `plugin/src/` (`optimize.ts`, `erd.ts`, `cleanup.ts`), preserve `optimizeDiagramNodes` which converts ERD tables into native vertical Auto Layout frames and dissolves redundant nested wrapper groups.
 3. **Theme Synchronization**: The diagram appearance is directly synchronized with the UI theme (`light` and `dark`). Light mode renders clean neutral cards; dark mode renders midnight cyan cards.
 4. **Mobile Layout Architecture**: Mobile uses a streamlined 2-row layout: Row 1 = Brand + compact theme/export/copy actions; Row 2 = Tab switcher + quick tool icons. Do not introduce a cluttered 3rd row.
 5. **Static Assets**: All public-facing static assets (logos, favicon, og-image) reside in `public/` and are referenced from `/logo/...` or root. Assets used inside the Figma plugin UI (e.g. the logo icon) must instead be imported with `?inline` from `src/assets/`, because `plugin/ui.html` is a single file and `/logo/...` URLs do not resolve there.
 6. **One Phase Per Session**: Work on one phase at a time per session and update the checklist in `plans/mermapix-plan.md`.
+7. **Offline, no network**: the plugin declares `networkAccess: none` and the listing promises 100% offline. Never add a remote font, script, stylesheet or fetch. Fonts are self-hosted woff2 in `src/assets/fonts/` (inlined into the plugin UI by `assetsInlineLimit`); `scripts/build-plugin.mjs` also strips any remote CSS `@import` from the plugin build.
+8. **Generated bundles are committed**: `plugin/code.js`, `plugin/ui.html`, `plugin-dev/code.js`, `plugin-dev/ui.html`. After changing `plugin/src/`, `src/export/`, `src/themes/`, `src/plugin/`, `src/index.css` or a fixture, run `pnpm build:plugin` and `pnpm build:test-runner` and commit the outputs, or Figma keeps running the old code.
 
 ## Dependencies
 

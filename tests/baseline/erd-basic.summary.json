@@ -1,17 +1,17 @@
 {
   "elements": {
-    "g": 118,
+    "g": 121,
     "rect": 41,
-    "path": 60,
+    "path": 64,
     "polygon": 0,
-    "circle": 4,
+    "circle": 5,
     "line": 0,
     "text": 41,
     "tspan": 30,
     "foreignObject": 0,
     "style": 0
   },
-  "hasClassAttr": false,
+  "hasClassAttr": true,
   "hasStyleAttr": false,
   "texts": [
     "places",
@@ -47,14 +47,15 @@
   ],
   "fills": [
     "none",
-    "rgb(138, 148, 166)",
-    "rgb(238, 241, 245)",
-    "rgb(254, 254, 254)",
+    "rgb(13, 18, 25)",
+    "rgb(21, 29, 42)",
+    "rgb(248, 250, 252)",
     "rgb(255, 255, 255)",
-    "rgb(31, 39, 51)"
+    "rgb(30, 41, 59)",
+    "rgb(56, 189, 248)"
   ],
   "strokes": [
     "none",
-    "rgb(138, 148, 166)"
+    "rgb(56, 189, 248)"
   ]
 }

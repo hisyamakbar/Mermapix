@@ -76,7 +76,7 @@ The test runner loads each fixture into the web editor via `localStorage`, progr
 
 > Note: Absolute coordinates are intentionally excluded from comparison to avoid false positives caused by cross-platform font hinting differences.
 
-> The Phase 0 baselines (`baseline/*.summary.json`) no longer match the current pipeline (extra `<g>`/`<path>` counts, fill palette; also true on commits before Phase 10.1). The positive-origin viewBox fix does not touch them: ERD, flowchart and sequence exports are byte-identical to before apart from rough.js path jitter.
+> Baselines were refreshed on 2026-11-06 (after Phases 8–10: palette, marker inlining, export fixes) and the compare passes again. The `inlined-marker …` classes added by `src/export/markers.ts` are intentional and allowed by the class-leak check; any other `class` attribute in an export is still a failure.
 
 To intentionally update verified baselines after updating fixtures or themes:
 ```bash

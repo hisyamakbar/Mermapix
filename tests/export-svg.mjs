@@ -134,7 +134,10 @@ function summarize(svg) {
   const strokes = [...new Set([...svg.matchAll(/\sstroke="([^"]+)"/g)].map((m) => m[1]))].sort()
   return {
     elements: Object.fromEntries(["g", "rect", "path", "polygon", "circle", "line", "text", "tspan", "foreignObject", "style"].map((t) => [t, count(t)])),
-    hasClassAttr: /\sclass="/.test(svg),
+    // Mermaid's own classes must be stripped. The `inlined-marker …` classes are added on
+    // purpose by src/export/markers.ts (Phase 8.1): the plugin uses them to recognise
+    // already-inlined markers and to name them; Figma ignores class attributes.
+    hasClassAttr: [...svg.matchAll(/\sclass="([^"]*)"/g)].some((m) => !/^inlined-marker\b/.test(m[1])),
     hasStyleAttr: /\sstyle="/.test(svg),
     texts,
     fills,

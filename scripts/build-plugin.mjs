@@ -61,7 +61,13 @@ if (!cssFile || !jsFile) {
 
 console.log(`📦 Inlining assets: ${cssFile} & ${jsFile}...`)
 
-const cssContent = fs.readFileSync(path.join(assetsDir, cssFile), 'utf-8')
+// The web app loads Inter / JetBrains Mono from Google Fonts (src/index.css). The plugin
+// declares `networkAccess: none`, so that request is blocked anyway, and Figma's review
+// flags undeclared network use. Strip remote @imports from the plugin build only; the UI
+// falls back to the local Inter / system font stack it already used.
+const cssContent = fs
+  .readFileSync(path.join(assetsDir, cssFile), 'utf-8')
+  .replace(/@import\s*(?:url\()?\s*["']?https?:\/\/[^;]*;/g, '')
 const jsContent = fs.readFileSync(path.join(assetsDir, jsFile), 'utf-8')
 
 // Figma iframe needs a self-contained HTML document

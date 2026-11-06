@@ -255,3 +255,32 @@ test('[state extras/dark] description alias, concurrent regions, multi-line note
   const bad = all(r.root, (n, p) => n !== r.root && isGenericName(n.name) && !(n.name === 'Line' && p && p.name.startsWith('Edge: ')))
   assert.deepEqual(bad.map((n) => `${n.type}:${n.name}`), [])
 })
+
+// User case 2026-11-06: order lifecycle (LR, composite with its own start/end, labelled
+// transitions, a two-line note on the right).
+for (const theme of THEMES) {
+  test(`[state order lifecycle/${theme}] composite, notes and labelled transitions: zero-drop, every part a frame, named edges`, async () => {
+    const r = await runFixture('42-case-state-order', theme)
+    const before = importSvg({ ids: 0 }, r.svgSeen)
+    assert.deepEqual(textsOf(r.root), textsOf(before))
+    const frameNames = all(r.root, (n) => n.type === 'FRAME').map((n) => n.name)
+    for (const s of ['Placed', 'Paid', 'Cancelled', 'Delivered', 'Packing', 'Shipped', 'Fulfilment']) {
+      assert.ok(frameNames.includes(`State: ${s}`), `State: ${s} is a frame`)
+    }
+    const fulfilment = all(r.root, (n) => n.type === 'FRAME' && n.name === 'State: Fulfilment')[0]
+    const body = fulfilment.children.find((k) => k.name === 'Body')
+    assert.deepEqual(body.children.map((k) => k.name).sort(), ['End', 'Start', 'State: Packing', 'State: Shipped'])
+    const note = all(r.root, (n) => n.type === 'FRAME' && n.name.startsWith('Note: Payment can be card'))[0]
+    assert.ok(note, 'the note is a frame')
+    assert.equal(note.children[0].characters, 'Payment can be card,\nwallet, or bank transfer')
+    const edges = all(r.root, (n) => n.type === 'GROUP' && n.name.startsWith('Edge: ')).map((e) => e.name)
+    assert.equal(edges.length, 11, "10 transitions + the note link")
+    for (const e of ['Edge: Placed → Paid', 'Edge: Placed → Cancelled', 'Edge: Paid → Fulfilment', 'Edge: Fulfilment → Delivered', 'Edge: Packing → Shipped']) {
+      assert.ok(edges.includes(e), e)
+    }
+    const labels = all(r.root, (n) => n.type === 'FRAME' && n.name.startsWith('Label: ')).map((n) => n.name).sort()
+    assert.deepEqual(labels, ['Label: courier confirms', 'Label: customer cancels', 'Label: handed to courier', 'Label: payment received'])
+    const bad = all(r.root, (n, p) => n !== r.root && isGenericName(n.name) && !(n.name === 'Line' && p && p.name.startsWith('Edge: ')))
+    assert.deepEqual(bad.map((n) => `${n.type}:${n.name}`), [])
+  })
+}

@@ -2,9 +2,8 @@
 
 **Mermapix** — Mermaid to Editable Figma. Paste Mermaid diagrams (ERD-first), DBML, or SQL schemas and get editable Figma vector layers with native Auto Layout, not flat images.
 
-- Source of truth for roadmap, architectural rules, and phase checklist: [`plans/mermapix-plan.md`](plans/mermapix-plan.md). Read its "Agent Rules" section before any modifications.
-- Work one phase per session and update the checklist in that file when done.
-- Decision history: `plans/archive/`.
+- Maintainers keep the roadmap, phase checklist and decision history in `plans/mermapix-plan.md` (+ `plans/archive/`). `plans/` is maintainer-local and not part of the public repository; when it exists, read its "Agent Rules" section before any modifications and update its checklist when a phase is done.
+- Contributors without `plans/`: this file, [`tests/README.md`](tests/README.md) and [`CHANGELOG.md`](CHANGELOG.md) describe the architecture, the test harness and what changed.
 
 ---
 

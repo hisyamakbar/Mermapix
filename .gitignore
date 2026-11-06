@@ -5,6 +5,9 @@ node_modules/
 # Production builds
 dist/
 dist-plugin/
+dist-test-runner/
+dist-test-runner-sandbox/
+dist-plugin-sandbox/
 dist-oss/
 build/
 

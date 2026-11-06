@@ -4927,6 +4927,68 @@
 		applyRootBackground(rootNode, themeVariables);
 	}
 	//#endregion
+	//#region plugin/src/diagram.ts
+	/** Preload standard fonts so text metrics and property operations never fail. */
+	async function loadDiagramFonts() {
+		try {
+			await Promise.all([
+				{
+					family: "Inter",
+					style: "Regular"
+				},
+				{
+					family: "Inter",
+					style: "Medium"
+				},
+				{
+					family: "Inter",
+					style: "Semi Bold"
+				},
+				{
+					family: "Inter",
+					style: "Bold"
+				},
+				{
+					family: "Inter",
+					style: "Italic"
+				},
+				{
+					family: "Inter",
+					style: "Bold Italic"
+				},
+				{
+					family: "Arial",
+					style: "Regular"
+				},
+				{
+					family: "Arial",
+					style: "Bold"
+				}
+			].map((f) => figma.loadFontAsync(f).catch(() => {})));
+		} catch (fontErr) {}
+	}
+	function ensureAllLayersVisible(n) {
+		if (!n || n.removed) return;
+		try {
+			n.visible = true;
+		} catch (_unused) {}
+		if ("children" in n && Array.isArray(n.children)) for (const child of n.children) ensureAllLayersVisible(child);
+	}
+	/**
+	* Imports the UI's SVG payload as editable layers on the current page and runs the optimizer.
+	* Fonts must already be loaded (`loadDiagramFonts`). Returns the diagram root node.
+	*/
+	function createDiagramNode(msg) {
+		const processedSvg = prepareSvgForFigma(msg.svg);
+		const node = figma.createNodeFromSvg(processedSvg);
+		node.name = msg.name || "Mermapix Diagram";
+		ensureAllLayersVisible(node);
+		figma.currentPage.appendChild(node);
+		optimizeDiagramNodes(node, msg.themeVariables, diagramTypeFromSvg(msg.svg));
+		ensureAllLayersVisible(node);
+		return node;
+	}
+	//#endregion
 	//#region plugin/src/main.ts
 	figma.showUI(__html__, {
 		width: 500,
@@ -4935,56 +4997,12 @@
 	});
 	figma.ui.onmessage = async (msg) => {
 		if (msg.type === "create-svg" && msg.svg) try {
-			try {
-				await Promise.all([
-					{
-						family: "Inter",
-						style: "Regular"
-					},
-					{
-						family: "Inter",
-						style: "Medium"
-					},
-					{
-						family: "Inter",
-						style: "Semi Bold"
-					},
-					{
-						family: "Inter",
-						style: "Bold"
-					},
-					{
-						family: "Inter",
-						style: "Italic"
-					},
-					{
-						family: "Inter",
-						style: "Bold Italic"
-					},
-					{
-						family: "Arial",
-						style: "Regular"
-					},
-					{
-						family: "Arial",
-						style: "Bold"
-					}
-				].map((f) => figma.loadFontAsync(f).catch(() => {})));
-			} catch (fontErr) {}
-			const processedSvg = prepareSvgForFigma(msg.svg);
-			const node = figma.createNodeFromSvg(processedSvg);
-			node.name = msg.name || "Mermapix Diagram";
-			function ensureAllLayersVisible(n) {
-				if (!n || n.removed) return;
-				try {
-					n.visible = true;
-				} catch (_unused) {}
-				if ("children" in n && Array.isArray(n.children)) for (const child of n.children) ensureAllLayersVisible(child);
-			}
-			ensureAllLayersVisible(node);
-			figma.currentPage.appendChild(node);
-			optimizeDiagramNodes(node, msg.themeVariables, diagramTypeFromSvg(msg.svg));
-			ensureAllLayersVisible(node);
+			await loadDiagramFonts();
+			const node = createDiagramNode({
+				svg: msg.svg,
+				name: msg.name,
+				themeVariables: msg.themeVariables
+			});
 			const center = figma.viewport.center;
 			node.x = Math.round(center.x - node.width / 2);
 			node.y = Math.round(center.y - node.height / 2);

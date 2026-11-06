@@ -68,6 +68,7 @@ Mermapix/
 │   ├── manifest.json               # Figma Plugin manifest (Figma Plugin API v1)
 │   ├── src/                        # Plugin sandbox TypeScript modules (bundled to code.js)
 │   │   ├── main.ts                 # Entry: figma.showUI + figma.ui.onmessage
+│   │   ├── diagram.ts              # Shared fonts + createDiagramNode (prepareSvgForFigma -> createNodeFromSvg -> optimize); also used by plugin-dev
 │   │   ├── optimize.ts             # optimizeDiagramNodes orchestrator + DIAGRAM_STEPS registry
 │   │   ├── erd.ts                  # ERD entity detection + native Auto Layout table conversion
 │   │   ├── cleanup.ts              # Purge, wrapper dissolve, sequence-number elevate, root unwrap, final naming
@@ -84,6 +85,10 @@ Mermapix/
 │   ├── ui.html                     # Standalone bundled plugin dialog UI
 │   ├── assets/                     # Publishing visual assets (icon-128.png, cover-1920x1080.png)
 │   └── PUBLISHING_GUIDE.md         # Official community publishing checklist and form
+├── plugin-dev/                     # Developer-only Figma plugin "Mermapix Test Runner" (not published; `pnpm build:test-runner`)
+│   ├── manifest.json               # Own manifest/id (mermapix-test-runner-dev)
+│   ├── src/                        # main.ts sandbox, auditCore.js (shared audit), gridLayout.ts, protocol.ts, ui/ (React UI)
+│   └── code.js / ui.html           # Generated, committed (import plugin-dev/manifest.json in Figma Desktop)
 ├── public/                         # Static assets served at root
 │   ├── favicon.ico                 # 16/32/48 favicon (PNG-compressed entries)
 │   ├── favicon-32.png              # PNG favicon

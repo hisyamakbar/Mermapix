@@ -44,6 +44,23 @@ pnpm test:export
 - `MERMAPIX_CODE=<path> pnpm test:unit` runs the plugin tests against another bundle (e.g. the previous `code.js`) to prove a new test fails before the fix. The mock importer reproduces real Figma's inline `<clipPath>` behavior (a visible shape, not a mask).
 - Regenerate a payload: load the `.mmd` in the web app, pick the theme and use the **SVG** export button (what the plugin UI posts).
 
+### Developer test runner (real Figma, one click)
+`plugin-dev/` is a separate, developer-only Figma plugin (**Mermapix Test Runner (dev)**, id `mermapix-test-runner-dev`). It is not published and not part of the production plugin. Its generated `plugin-dev/code.js` + `plugin-dev/ui.html` are committed, like `plugin/`, so you can import it without building.
+
+**How to run**
+1. Figma Desktop, open the file to test.
+2. Plugins > Development > **Import plugin from manifest...** > choose `plugin-dev/manifest.json` (once).
+3. Plugins > Development > **Mermapix Test Runner (dev)** > optionally filter fixtures / pick a theme > **Run all**. It renders every `tests/figma-fixtures/*.mmd` in dark and light (same Mermaid config, `buildExportSvg` and plugin conversion as the production plugin), inserts them on a new page `Test Run <YYYY-MM-DD HH:mm>`, one row per fixture with dark and light side by side, each inside a SECTION named `<fixture> · <theme>`. A failing fixture is recorded and does not stop the run.
+4. Send the agent the file link (and the page name, shown in the plugin).
+
+The runner audits each diagram (the `tests/figma-audit.js` metrics plus content overflowing the root frame, lost texts vs the payload SVG's `<text>` count, and near-black/near-white boxes over 25% of their parent) and shows a summary table (click a row to jump to it).
+
+**Where results are stored** (readable with `getSharedPluginData`; `setPluginData` is not available via MCP): `figma.root` namespace `mermapix` key `lastAudit` (run summary + per-diagram issues), the same on the page, per-diagram `mermapix`/`audit` and `mermapix`/`meta` on each diagram root frame (and `audit` on failed placeholder sections), plus a TEXT node `Audit Summary` above the grid.
+
+**How the agent reads them**: paste `tests/figma-read-audit.js` into `use_figma`. It returns `{ run, problems, clean }` (set `FULL = true` or list keys in `DETAIL` for the full per-diagram audit). `tests/figma-audit.js` is the older standalone audit of the current page (frames and sections); it is generated from `plugin-dev/src/auditCore.js`, the same module the runner uses, so they cannot drift (`node scripts/gen-figma-audit.mjs`, also run by the build, and checked by a unit test).
+
+**Build**: `pnpm build:test-runner` (writes `plugin-dev/code.js`, `plugin-dev/ui.html`, regenerates `tests/figma-audit.js`). Run it after changing `plugin/src/`, `src/export/`, `src/themes/` or a fixture, because the runner bundles them. `pnpm build:plugin` is unaffected. Mock-Figma coverage: `unit/test-runner.test.mjs` (`plugin-mock/dev-runner.mjs` adds pages, sections, shared plugin data to the mock; Auto Layout positions are not recomputed by the mock, so `contentOverflow` is only meaningful in real Figma).
+
 ### How the Regression Harness Works
 The test runner loads each fixture into the web editor via `localStorage`, programmatically clicks the **"SVG"** export action, captures the downloaded file, and compares its structural fingerprint (`*.summary.json`):
 - Element counts (`rect`, `path`, `text`, `tspan`, etc.)

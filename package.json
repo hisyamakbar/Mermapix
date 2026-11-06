@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "format": "oxfmt",
     "build:plugin": "node scripts/build-plugin.mjs",
+    "build:test-runner": "node scripts/build-test-runner.mjs",
     "export:oss": "node scripts/export-clean-oss.mjs",
     "test:export": "node tests/export-svg.mjs --out tests/output --compare tests/baseline",
     "test:colors": "node tests/color-audit.mjs",

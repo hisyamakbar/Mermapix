@@ -19,5 +19,5 @@
     "strict": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "plugin/src", "vite.config.ts"]
+  "include": ["src", "plugin/src", "plugin-dev/src", "vite.config.ts"]
 }

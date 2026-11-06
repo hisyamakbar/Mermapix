@@ -29,6 +29,7 @@ All notable changes to Mermapix are documented here. The format follows
 - Export: eventmodeling card labels (HTML `<foreignObject>`) were dropped; they are converted to editable text.
 - Export: elements Mermaid hides (`display: none`, e.g. the treemap root value) showed up in Figma.
 - Export: gantt milestones lost their diamond shape (CSS-only rotation is now written into the SVG).
+- Export: journey section titles ("Go to work") came out in their section's own fill color and were invisible; they now use the label color the browser shows.
 - Gantt: the chart width followed the window width (labels pushed outside their bars in the plugin); it is now a fixed 1200px.
 - Plugin: inline label `<clipPath>`s landed as black boxes (treemap); the root frame now grows to fit its content instead of cropping.
 - Plugin: Insert is disabled while the code has a syntax error, and "Added!" only appears after the canvas confirms the insert.

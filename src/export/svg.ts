@@ -187,6 +187,25 @@ function bakeCssTransform(
   target.removeAttribute('transform-origin')
 }
 
+// The rendered text color of the HTML label that a <switch>'s <text> fallback stands in for.
+function switchSiblingTextColor(text: SVGTextElement): string | null {
+  const parent = text.parentElement
+  if (!parent || parent.tagName.toLowerCase() !== 'switch') return null
+  const html = Array.from(parent.children).find(
+    (c) => c.tagName.toLowerCase() === 'foreignobject' && c.textContent?.trim(),
+  )
+  if (!html) return null
+  // The deepest element that holds the label text carries the color it was drawn with.
+  let holder: Element = html
+  for (;;) {
+    const next = Array.from(holder.children).find((c) => c.textContent?.trim())
+    if (!next) break
+    holder = next
+  }
+  const color = window.getComputedStyle(holder).color
+  return color && color !== 'transparent' && !/rgba\([^)]*,\s*0\)$/.test(color) ? color : null
+}
+
 export function buildExportSvg(
   diagramContainer: HTMLElement | null,
 ): { serialized: string; width: number; height: number } | null {
@@ -334,6 +353,14 @@ export function buildExportSvg(
       } else if (computed.color && computed.color !== 'none') {
         textFill = computed.color
       }
+
+      // Journey wraps each label in <switch>: the browser shows the <foreignObject> HTML label,
+      // and the <text> fallback is what the export keeps. Mermaid's section rule
+      // (`.section-type-N { fill: … }`) also hits that fallback, so the section titles came out
+      // in the section's own fill color (invisible, 1:1). Use the color the HTML label was
+      // actually drawn with.
+      const switchHtmlColor = switchSiblingTextColor(element)
+      if (switchHtmlColor) textFill = switchHtmlColor
 
       target.setAttribute('text-anchor', 'start')
       target.setAttribute('fill', textFill)

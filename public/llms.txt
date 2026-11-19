@@ -21,7 +21,7 @@ With Mermapix:
 
 ## Quick Links
 
-- [Web Application](https://mermapix.netlify.app/): Instant web canvas, Open in Figma, and SVG/PNG downloads.
+- [Web Application](https://mermapix.hisyamakbar.com/): Instant web canvas, Open in Figma, and SVG/PNG downloads.
 - [GitHub Repository](https://github.com/hisyamakbar/Mermapix): Open-source MIT repository, issues, and contributing.
 - [Figma Community Plugin](https://www.figma.com/community/plugin/1693698850206280915): Companion plugin (published, free, offline) for native Auto Layout frames.
-- [Full LLM Technical Guide](https://mermapix.netlify.app/llms-full.txt): Complete technical reference, parser details, and prompt examples for AI agents.
+- [Full LLM Technical Guide](https://mermapix.hisyamakbar.com/llms-full.txt): Complete technical reference, parser details, and prompt examples for AI agents.

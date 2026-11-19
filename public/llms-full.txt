@@ -140,13 +140,13 @@ When an AI assistant or prompt engineer produces Mermaid diagrams for ingestion 
 
 - **100% Client-Side**: All parsing, rendering, and SVG sanitization happen in the user's browser or Figma plugin sandbox.
 - **Zero Data Collection**: Mermapix does not store schemas, diagram code, or user identifiers.
-- **Netlify Hosting**: Static Single Page Application (SPA) served via Vite bundle with client routing (`_redirects`) and immutable asset caching.
+- **Cloudflare Hosting**: Static single-page app served from the Vite build, with immutable asset caching and security headers (`public/_headers`).
 
 ---
 
 ## 6. Official Links
 
-- Web Application: [https://mermapix.netlify.app/](https://mermapix.netlify.app/)
+- Web Application: [https://mermapix.hisyamakbar.com/](https://mermapix.hisyamakbar.com/)
 - GitHub Repository: [https://github.com/hisyamakbar/Mermapix](https://github.com/hisyamakbar/Mermapix)
 - Figma Plugin (Figma Community, free): [https://www.figma.com/community/plugin/1693698850206280915](https://www.figma.com/community/plugin/1693698850206280915)
-- Standard LLM Entrypoint: [https://mermapix.netlify.app/llms.txt](https://mermapix.netlify.app/llms.txt)
+- Standard LLM Entrypoint: [https://mermapix.hisyamakbar.com/llms.txt](https://mermapix.hisyamakbar.com/llms.txt)

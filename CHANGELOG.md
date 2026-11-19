@@ -9,6 +9,7 @@ All notable changes to Mermapix are documented here. The format follows
 ### Changed
 - Web app: the main button is now **Open in Figma**. It opens the Mermapix plugin on Figma Community in a new tab (a plain link: it does not copy the code; paste your Mermaid code into the plugin and click Insert). **Copy to Figma** (SVG via the clipboard) is removed: a pasted SVG has no Auto Layout and is far behind what the plugin builds. SVG and PNG downloads stay. The plugin itself is unchanged.
 - Web app: the onboarding card shown when the editor is empty now reads, in step 3, "Open in Figma: Get the Mermapix plugin, paste your code and click Insert".
+- The web app moved to https://mermapix.hisyamakbar.com (Cloudflare); the old mermapix.netlify.app address redirects there. Canonical URL, Open Graph, structured data, `robots.txt`, `sitemap.xml` and the `llms` files use the new address, and the response headers moved from `netlify.toml` to `public/_headers`.
 - README, `llms.txt`, `llms-full.txt` and the structured data point to the Figma Community listing; the README has an install section for the published plugin and keeps the development-plugin steps for contributors.
 
 ### Fixed

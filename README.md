@@ -11,7 +11,7 @@
 [![Contrast: audited](https://img.shields.io/badge/Contrast-WCAG_AA_audited-cyan.svg)](tests/color-audit.mjs)
 [![Version](https://img.shields.io/badge/version-1.1.0-ec4899.svg)](CHANGELOG.md)
 
-**Get the Figma plugin:** [Mermapix on Figma Community](https://www.figma.com/community/plugin/1693698850206280915) (Figma Design and FigJam, free, works offline). The web app needs no install.
+**Get the Figma plugin:** [Mermapix on Figma Community](https://www.figma.com/community/plugin/1693698850206280915) (Figma Design and FigJam, free, works offline). **Try the web app:** [mermapix.hisyamakbar.com](https://mermapix.hisyamakbar.com) (no install).
 
 ---
 

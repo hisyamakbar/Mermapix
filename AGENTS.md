@@ -25,22 +25,20 @@ This is the canonical project structure. Start with task-relevant files below.
 ```
 Mermapix/
 ├── src/
-│   ├── main.tsx                    # React entrypoint mounting into #root (imports index.css, then web.css)
+│   ├── main.tsx                    # React entrypoint mounting into #root
 │   ├── App.tsx                     # Top-level state coordinator (code, theme, sidebar, modal)
 │   ├── index.css                   # Global CSS, Tailwind v4 imports, design tokens, responsive styles (shared with the plugin UI)
-│   ├── web.css                     # Web app only styles (Open in Figma link); not in the plugin bundle
 │   ├── links.ts                    # FIGMA_PLUGIN_URL (Figma Community listing)
 │   ├── vite-env.d.ts               # Vite client types (?raw imports)
 │   ├── components/                 # UI components
-│   │   ├── Toolbar.tsx             # Plugin toolbar (shared component used by src/plugin/AppPlugin.tsx): brand logo, theme toggle, export (hidden in the plugin: `showExport`), primary action (Insert / Update with its states: `primaryActionDisabled`)
-│   │   ├── WebToolbar.tsx          # Web app toolbar (fork of Toolbar.tsx): theme toggle, SVG/PNG downloads, Open in Figma (red, plain link to the Community plugin in a new tab)
-│   │   ├── FigmaIcon.tsx           # Lucide-style Figma mono-outline icon (lucide ISC); used only to refer to Figma
+│   │   ├── Toolbar.tsx             # Navbar shared by web and plugin: brand logo, theme toggle, export (hidden in the plugin: `showExport`), primary action: plugin = Insert / Update with its states (`primaryActionDisabled`), web = red "Open in Figma" link to the Community plugin (`primaryActionHref`)
+│   │   ├── FigmaIcon.tsx           # Lucide-style Figma mono-outline icon (lucide ISC); used only to refer to Figma (web toolbar link, onboarding step, About link)
 │   │   ├── EditorPanel.tsx         # Sidebar editor container with unified mobile/desktop toolbar
 │   │   ├── CodeEditor.tsx          # Code editor with syntax highlighting, line numbers, error alerts
 │   │   ├── Canvas.tsx              # Interactive pan/zoom canvas and floating zoom pill
-│   │   ├── CanvasEmptyState.tsx    # 3-step onboarding card with sample loader
+│   │   ├── CanvasEmptyState.tsx    # 3-step onboarding card with sample loader; `variant` "web" (step 3 links to the Community plugin) or "plugin" (step 3 describes Insert)
 │   │   ├── ImportModal.tsx         # DBML & SQL schema import modal with table naming options
-│   │   ├── AboutModal.tsx          # About dialog with open source licenses and disclaimers
+│   │   ├── AboutModal.tsx          # About dialog with open source licenses and disclaimers; `showPluginLink` (web only) adds the Figma Community link
 │   │   ├── MermapixLogo.tsx        # Brand lockup: inline SVG (icon as ?inline WebP data URL + wordmark paths)
 │   │   └── mermaidHighlighter.ts   # Syntax token parser for Mermaid code
 │   ├── converters/                 # Schema to Mermaid ERD parsers
@@ -63,10 +61,12 @@ Mermapix/
 │   ├── plugin/                     # Figma plugin UI (built into plugin/ui.html)
 │   │   ├── index.html / main.tsx   # Plugin UI entry
 │   │   ├── AppPlugin.tsx           # Plugin app: editor, preview, insert, edit mode for source-linked diagrams (live update queue, automatic apply)
+│   │   ├── plugin-window.css       # Plugin-only: html/body/#root/app root fill the iframe and never scroll (Windows page scrollbar); imported by main.tsx, not by the web app
 │   │   ├── SourceLinkStrip.tsx     # Contextual strip: "Diagram selected", "Editing: ..." with Live switch and Revert, Save (✕ Close in a component instance), apply result with Undo, Save confirmations
 │   │   ├── sourcePatch.ts          # Pure: applyTextChanges, writes text edited on the canvas back into Mermaid code
 │   │   ├── changeSummary.ts        # Pure: pendingEdits (canvas edits restated against the current code), wording of the apply result and the update confirmation
 │   │   ├── liveSync.ts             # Pure: live update rules (when an update is due, slow detection, Live switch, editor hint)
+│   │   ├── figmaTheme.ts           # Pure: Figma's theme from the `figma-light`/`figma-dark` class on <html>, which theme wins (open, Figma switch, edit mode)
 │   │   └── diagramName.ts          # Pure: layer name of a new diagram, from its code (frontmatter title, title directive, accTitle, diagram type)
 │   ├── utils/
 │   │   └── sanitize.ts             # AI markdown fence sanitizer
@@ -139,12 +139,12 @@ Mermapix/
 
 1. **Protect the SVG Export Pipeline**: `buildExportSvg` / `copyToFigma` in `src/export/svg.ts` and `htmlLabels: false` in `src/themes/presets.ts` are the core of the product. Never change the computed-style capture (`SVG_PRESENTATION_PROPERTIES`), the rewrite of every `<text>` into flat, absolutely positioned `<tspan>` rows (this is what makes Figma import editable text instead of outlines), or `htmlLabels: false`. Any other change to `svg.ts` needs the user's explicit approval for that specific bug and must be re-verified on every `tests/figma-fixtures/*.mmd` (`node tests/export-fixtures.mjs`). Approved so far (2026-11-06, see `plans/mermapix-plan.md` Phase 10): viewBox padding for any origin (`padViewBoxAxis`), `<foreignObject>` labels converted to `<text>` (`convertForeignObjectLabels`), elements Mermaid hides with `display:none` are dropped, CSS-only transforms baked into `transform=matrix()` (`bakeCssTransform`), `<switch>` text fallbacks take the color of the HTML label they replace (`switchSiblingTextColor`, journey).
 2. **Plugin Auto Layout Engine**: In `plugin/src/` (`optimize.ts`, `erd.ts`, `cleanup.ts`), preserve `optimizeDiagramNodes` which converts ERD tables into native vertical Auto Layout frames and dissolves redundant nested wrapper groups.
-3. **Theme Synchronization**: The diagram appearance is directly synchronized with the UI theme (`light` and `dark`). Light mode renders clean neutral cards; dark mode renders midnight cyan cards.
+3. **Theme Synchronization**: The diagram appearance is directly synchronized with the UI theme (`light` and `dark`). Light mode renders clean neutral cards; dark mode renders midnight cyan cards. In the plugin the default follows Figma's theme (`themeColors: true` in `figma.showUI`, class `figma-light`/`figma-dark` on `<html>`, `src/plugin/figmaTheme.ts`); the toggle is per session and the theme is not stored. While a linked diagram is edited, its own stored theme stays in force.
 4. **Mobile Layout Architecture**: Mobile uses a streamlined 2-row layout: Row 1 = Brand + compact theme/export/copy actions; Row 2 = Tab switcher + quick tool icons. Do not introduce a cluttered 3rd row.
 5. **Static Assets**: All public-facing static assets (logos, favicon, og-image) reside in `public/` and are referenced from `/logo/...` or root. Assets used inside the Figma plugin UI (e.g. the logo icon) must instead be imported with `?inline` from `src/assets/`, because `plugin/ui.html` is a single file and `/logo/...` URLs do not resolve there.
 6. **One Phase Per Session**: Work on one phase at a time per session and update the checklist in `plans/mermapix-plan.md`.
 7. **Offline, no network**: the plugin declares `networkAccess: none` and the listing promises 100% offline. Never add a remote font, script, stylesheet or fetch. Fonts are self-hosted woff2 in `src/assets/fonts/` (inlined into the plugin UI by `assetsInlineLimit`); `scripts/build-plugin.mjs` also strips any remote CSS `@import` from the plugin build.
-8. **Web-only changes stay out of the plugin bundle**: the plugin UI imports shared components (`Toolbar`, `Canvas`, `CanvasEmptyState`, `EditorPanel`, `AboutModal`, ...) and `src/index.css`. A change meant only for the web app goes into web-only files (`WebToolbar.tsx`, `web.css`, `App.tsx`), so `pnpm build:plugin` stays byte-identical and the published plugin is not affected until the next plugin release.
+8. **Web-only changes between plugin releases must not change the plugin bundle**: the plugin UI imports the shared components (`Toolbar`, `Canvas`, `CanvasEmptyState`, `EditorPanel`, `AboutModal`, ...) and `src/index.css`. While a plugin release is published, a change meant only for the web app goes into `App.tsx`, a prop of the shared component, or a web-only file, so `pnpm build:plugin` stays byte-identical. Once the plugin is released, fold any such fork back into the shared component.
 9. **Generated bundles are committed**: `plugin/code.js`, `plugin/ui.html`, `plugin-dev/code.js`, `plugin-dev/ui.html`. After changing `plugin/src/`, `src/export/`, `src/themes/`, `src/plugin/`, `src/index.css` or a fixture, run `pnpm build:plugin` and `pnpm build:test-runner` and commit the outputs, or Figma keeps running the old code.
 10. **Source-linked diagrams** (see `docs/source-linked-diagrams.md`):
    - The stored format is permanent. `mermapix:diagram` (`{ v: 1, source, theme, type }`) lives in users' Figma files; later builds must keep reading `v: 1`. Add a new version, never redefine one.

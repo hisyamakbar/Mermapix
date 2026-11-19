@@ -55,6 +55,7 @@ How the feature works: [`docs/source-linked-diagrams.md`](../docs/source-linked-
 | `unit/plugin-roundtrip.test.mjs` | The seam between the two halves: an edit on the mock canvas, reported by the sandbox bundle, written into the real example code. |
 | `unit/plugin-watch.test.mjs` | Live link: the sandbox watch (`watch-diagram`, page `nodechange`, debounce), repeated canvas edits written into the code as the UI does it (`pendingEdits`), quiet updates, one undo step per update, an edit made while an update loads fonts. |
 | `unit/live-sync.test.mjs` | Live update rules and wording (`src/plugin/liveSync.ts`). |
+| `unit/figma-theme.test.mjs` | Which theme the plugin shows: Figma's at open, on a Figma switch, in and after edit mode (`src/plugin/figmaTheme.ts`). |
 
 - `plugin-mock/session.mjs` starts the bundle once and lets a test send several messages (`send`), change the selection (`select`, fires `selectionchange`) and read what the sandbox posted. It adds a document, a page, `getNodeByIdAsync`, relaunch data and two failure switches (`IMPORT_FAILURE`, `OPTIMIZE_FAILURE`) to make the SVG import or the optimizer throw. `runPlugin` in `figma-mock.mjs` stays the single-message runner of the older suites.
 - The sandbox suites run the built `plugin/code.js`: run `pnpm build:plugin` first. `source-patch.test.mjs` imports the TypeScript directly and needs no build.
@@ -153,6 +154,17 @@ Live link (plugin stays open)
 - [ ] An ordinary diagram (about 0.8 s per update): live update stays on and simply waits a little longer after you stop typing.
 - [ ] A large diagram: only when each update takes several seconds does live update turn itself off with a note; **Update diagram** still works. The plugin console (Plugins > Development > Show console) logs where the time of a slow update goes.
 - [ ] Start from the **Edit diagram** button with the plugin closed: it opens in edit mode with the diagram's code.
+
+Plugin theme follows Figma (production plugin; switch Figma's theme in its preferences while the plugin is open)
+- [ ] Figma in dark: open the plugin: UI, preview and the Light/Dark toggle are dark. Close it, switch Figma to light, open it again: light (the previous run's theme is not remembered).
+- [ ] With the plugin open, switch Figma's theme: the plugin follows at once, even after you used the Light/Dark toggle. The toggle itself still changes the theme for this session.
+- [ ] Insert a diagram: it uses the theme shown in the plugin (light plugin = light diagram).
+- [ ] Select a diagram stored in the other theme and **Edit source**: the plugin shows the diagram's theme. Switch Figma's theme during the edit: the plugin theme does not change and the diagram is not regenerated (no extra undo step in Figma). **Save**: the plugin goes to Figma's current theme. Repeat without switching Figma: after **Save** the theme you had before editing comes back.
+- [ ] The plugin looks the same as before (Figma's `--figma-color-*` variables must not change colors or fonts).
+
+Plugin window never scrolls (Windows; macOS hides the problem because its scrollbars overlay)
+- [ ] Windows, Figma desktop: open the plugin (500x680) in the Code tab, the Diagram tab, the empty-editor card, with the Examples menu open and with the About and Import dialogs open: no scrollbar along the window edge. Mouse wheel and touchpad scrolling over the header, the tab bar and the footer do nothing; only the code editor, the diagram canvas (pan), the Examples menu and a dialog taller than the window scroll on their own.
+- [ ] Edit mode with the note and the "Added ... text edits" row showing: nothing scrolls away, Save/Revert/Undo stay reachable. Repeat with Windows display scaling at 125% and 150%.
 
 Edits made in Figma
 - [ ] Change a flowchart node label on the canvas with the plugin closed, then **Edit source**: the label is added to the code ("Added 1 text edit from Figma to the code."); **Update diagram** runs without a question.

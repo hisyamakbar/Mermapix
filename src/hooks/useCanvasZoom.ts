@@ -3,6 +3,8 @@ import type { ZoomState } from '../types/index.ts'
 
 const MIN_SCALE = 0.1
 const MAX_SCALE = 40
+const INTERACTIVE_SELECTOR =
+  'button, a, input, textarea, select, label, [role="button"], .canvas-empty-state'
 const clampScale = (scale: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale))
 
 export function useCanvasZoom(svg: string) {
@@ -182,6 +184,9 @@ export function useCanvasZoom(svg: string) {
 
   const handlePointerDown = (e: PointerEvent) => {
     if (e.button !== 0) return
+    // A press that starts on a control inside the canvas (empty-state buttons and links, zoom pill) is not a
+    // pan: capturing the pointer would retarget pointerup to the canvas and the control's click would be lost.
+    if ((e.target as Element).closest?.(INTERACTIVE_SELECTOR)) return
     setDragging(true)
     dragStart.current = { mx: e.clientX, my: e.clientY, tx: zoom.x, ty: zoom.y }
     e.currentTarget.setPointerCapture(e.pointerId)

@@ -1388,6 +1388,16 @@ button, a {
   transform: scale(0.94);
 }
 
+/* "Open in Figma" (web) is an <a> that must look exactly like the red primary button */
+a.export-button {
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a.export-button:visited {
+  color: #ffffff;
+}
+
 /* Empty State Onboarding */
 .canvas-empty-state {
   position: absolute;
@@ -1404,6 +1414,7 @@ button, a {
   text-align: center;
   color: var(--header-text);
   z-index: 5;
+  cursor: default;
 }
 
 .empty-state-logo {
@@ -1477,6 +1488,23 @@ button, a {
 .empty-load-btn {
   width: 100%;
   font-weight: 600;
+}
+
+.canvas-empty-state .empty-state-link {
+  color: var(--header-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.canvas-empty-state .empty-state-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.canvas-empty-state .empty-state-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* -------------------------------------------------------------
@@ -1993,10 +2021,11 @@ button, a {
    Figma Plugin Dedicated View Rules
 ------------------------------------------------------------- */
 .mpx-plugin-app {
-  width: 100vw;
-  height: 100vh;
-  max-width: 100vw;
-  max-height: 100vh;
+  /* % not vw/vh: 100vw includes a classic (Windows) scrollbar, 100% is the iframe */
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .mpx-plugin-app .mpx-toolbar {

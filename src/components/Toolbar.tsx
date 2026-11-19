@@ -7,17 +7,17 @@ import {
   Copy,
   Check,
   ChevronDown,
-  FileDown,
 } from 'lucide-react'
 import type { Theme } from '../types/index.ts'
 import MermapixLogo from './MermapixLogo.tsx'
+import FigmaIcon from './FigmaIcon.tsx'
 
 export interface ToolbarProps {
   theme: Theme
   onToggleTheme: () => void
   hasSvg: boolean
-  copied: boolean
-  onCopyToFigma: () => void
+  copied?: boolean
+  onCopyToFigma?: () => void
   onExportSvg?: () => void
   onExportPng?: () => void
   primaryActionLabel?: string
@@ -30,13 +30,18 @@ export interface ToolbarProps {
   showExport?: boolean
   /** Disable the primary action even when there is a diagram (for example "Up to date", "Updating..."). */
   primaryActionDisabled?: boolean
+  /**
+   * Render the primary action as a plain link that opens in a new tab ("Open in Figma", with the Figma icon)
+   * instead of a button. The web app passes the Figma Community plugin URL; the plugin does not use it.
+   */
+  primaryActionHref?: string
 }
 
 export default function Toolbar({
   theme,
   onToggleTheme,
   hasSvg,
-  copied,
+  copied = false,
   onCopyToFigma,
   onExportSvg,
   onExportPng,
@@ -48,6 +53,7 @@ export default function Toolbar({
   primaryActionIcon,
   showExport = true,
   primaryActionDisabled = false,
+  primaryActionHref,
 }: ToolbarProps) {
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
@@ -217,18 +223,33 @@ export default function Toolbar({
         )}
 
         {/* Primary Flagship Action (34px) */}
-        <button
-          type="button"
-          className={copied ? 'export-button is-copied' : 'export-button'}
-          onClick={onCopyToFigma}
-          disabled={!hasSvg || primaryActionDisabled}
-          title={primaryActionTooltip || 'Paste into Figma (Cmd/Ctrl+V) for editable vectors. For native Auto Layout, use the Mermapix Figma Plugin!'}
-          aria-label={copied ? (primaryActionCopiedLabel || 'Copied to clipboard! Ready to paste into Figma') : (primaryActionLabel || 'Copy to Figma')}
-        >
-          {copied ? <Check size={15} aria-hidden="true" /> : (primaryActionIcon || <Copy size={15} aria-hidden="true" />)}
-          <span className="export-text-full">{copied ? (primaryActionCopiedLabel || 'Copied! Paste in Figma') : (primaryActionLabel || 'Copy to Figma')}</span>
-          <span className="export-text-short">{copied ? (primaryActionShortCopiedLabel || 'Copied') : (primaryActionShortLabel || 'Figma')}</span>
-        </button>
+        {primaryActionHref ? (
+          <a
+            href={primaryActionHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="export-button open-in-figma"
+            aria-label="Open in Figma (opens the Mermapix plugin in a new tab)"
+            title="Open the Mermapix plugin on Figma Community"
+          >
+            <FigmaIcon size={15} />
+            <span className="export-text-full">Open in Figma</span>
+            <span className="export-text-short">Figma</span>
+          </a>
+        ) : (
+          <button
+            type="button"
+            className={copied ? 'export-button is-copied' : 'export-button'}
+            onClick={onCopyToFigma}
+            disabled={!hasSvg || primaryActionDisabled}
+            title={primaryActionTooltip || 'Paste into Figma (Cmd/Ctrl+V) for editable vectors. For native Auto Layout, use the Mermapix Figma Plugin!'}
+            aria-label={copied ? (primaryActionCopiedLabel || 'Copied to clipboard! Ready to paste into Figma') : (primaryActionLabel || 'Copy to Figma')}
+          >
+            {copied ? <Check size={15} aria-hidden="true" /> : (primaryActionIcon || <Copy size={15} aria-hidden="true" />)}
+            <span className="export-text-full">{copied ? (primaryActionCopiedLabel || 'Copied! Paste in Figma') : (primaryActionLabel || 'Copy to Figma')}</span>
+            <span className="export-text-short">{copied ? (primaryActionShortCopiedLabel || 'Copied') : (primaryActionShortLabel || 'Figma')}</span>
+          </button>
+        )}
         <div className="sr-only" role="status" aria-live="polite">
           {copied ? (primaryActionCopiedLabel || 'Diagram copied to clipboard as editable SVG! Paste in Figma with Command V') : ''}
         </div>

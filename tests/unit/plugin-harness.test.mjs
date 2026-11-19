@@ -98,3 +98,13 @@ test('column widths are measured with the final font and fit their content', asy
     }
   }
 })
+
+test('showUI asks for themeColors, so Figma adds figma-light / figma-dark to the plugin UI (src/plugin/figmaTheme.ts)', async () => {
+  const r = await runPlugin(CODE, BASELINE_ERD, buildErdScene)
+  const shown = r.log.filter(([kind]) => kind === 'showUI')
+  assert.equal(shown.length, 1)
+  const [, [, options]] = shown[0]
+  assert.equal(options.themeColors, true)
+  assert.equal(options.width, 500)
+  assert.equal(options.height, 680)
+})

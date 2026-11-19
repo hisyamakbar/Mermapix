@@ -1,6 +1,8 @@
 import { useRef, useEffect } from 'react'
 import { X, ExternalLink, ShieldCheck, Heart, Sparkles, MessageCircleWarning } from 'lucide-react'
 import GithubIcon from './GithubIcon.tsx'
+import FigmaIcon from './FigmaIcon.tsx'
+import { FIGMA_PLUGIN_URL } from '../links.ts'
 import { version } from '../../package.json'
 
 const ISSUES_URL = 'https://github.com/hisyamakbar/Mermapix/issues'
@@ -8,9 +10,11 @@ const ISSUES_URL = 'https://github.com/hisyamakbar/Mermapix/issues'
 export interface AboutModalProps {
   isOpen: boolean
   onClose: () => void
+  /** Web app only: link to the Mermapix plugin on Figma Community. Hidden inside the plugin. */
+  showPluginLink?: boolean
 }
 
-export default function AboutModal({ isOpen, onClose }: AboutModalProps) {
+export default function AboutModal({ isOpen, onClose, showPluginLink = false }: AboutModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const closeBtnRef = useRef<HTMLButtonElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
@@ -174,6 +178,32 @@ export default function AboutModal({ isOpen, onClose }: AboutModalProps) {
             </a>
             . Released under the permissive <strong>MIT License</strong>.
           </p>
+
+          {showPluginLink && (
+            <a
+              href={FIGMA_PLUGIN_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="action-btn action-btn-secondary"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                width: '100%',
+                padding: '8px 14px',
+                borderRadius: 'var(--radius-sm)',
+                textDecoration: 'none',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--btn-text)',
+              }}
+            >
+              <FigmaIcon size={15} />
+              <span>Get the plugin on Figma Community</span>
+              <ExternalLink size={12} style={{ opacity: 0.6 }} />
+            </a>
+          )}
 
           <a
             href="https://github.com/hisyamakbar/Mermapix"

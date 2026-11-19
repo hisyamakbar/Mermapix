@@ -25,6 +25,8 @@ export interface CanvasProps {
   onPointerMove: (e: PointerEvent) => void
   onPointerUp: () => void
   onLoadSample: () => void
+  /** Which onboarding card to show on an empty canvas. */
+  emptyStateVariant: 'web' | 'plugin'
 }
 
 export default function Canvas({
@@ -49,6 +51,7 @@ export default function Canvas({
   onPointerMove,
   onPointerUp,
   onLoadSample,
+  emptyStateVariant,
 }: CanvasProps) {
   const gridCell = zoom.scale
   const gridOpacity = Math.max(0, Math.min(0.35, (zoom.scale - 4) * 0.09))
@@ -141,7 +144,7 @@ export default function Canvas({
         </button>
       </div>
 
-      {!svg && !code.trim() && <CanvasEmptyState onLoadSample={onLoadSample} />}
+      {!svg && !code.trim() && <CanvasEmptyState onLoadSample={onLoadSample} variant={emptyStateVariant} />}
       {!svg && code.trim() && (
         <p className="loading">{error ? 'Fix the code to render' : 'Rendering diagram…'}</p>
       )}

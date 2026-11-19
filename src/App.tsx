@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import mermaid from 'mermaid'
 import { PanelLeft, Code2, Network, Sparkles, ChevronDown, Wand2, FolderInput } from 'lucide-react'
 import { DEFAULT_EXAMPLE, EXAMPLES } from './examples/index.ts'
@@ -8,10 +7,9 @@ import { exportSvg, exportPng } from './export/svg.ts'
 import { useCanvasZoom } from './hooks/useCanvasZoom.ts'
 import { sanitizeMermaidCode } from './utils/sanitize.ts'
 import { FIGMA_PLUGIN_URL } from './links.ts'
-import WebToolbar from './components/WebToolbar.tsx'
+import Toolbar from './components/Toolbar.tsx'
 import EditorPanel from './components/EditorPanel.tsx'
 import Canvas from './components/Canvas.tsx'
-import WebEmptyState from './components/WebEmptyState.tsx'
 import ImportModal from './components/ImportModal.tsx'
 import AboutModal from './components/AboutModal.tsx'
 import type { Theme } from './types/index.ts'
@@ -106,14 +104,6 @@ export default function App() {
     handlePointerUp,
   } = useCanvasZoom(svg)
 
-  // The web onboarding card is portaled into the canvas section, outside Canvas's React tree, so the pan
-  // handlers (setPointerCapture) cannot swallow clicks on its buttons. See WebEmptyState.tsx.
-  const [canvasEl, setCanvasEl] = useState<HTMLElement | null>(null)
-  useEffect(() => {
-    setCanvasEl(canvasRef.current)
-  }, [canvasRef])
-  const showEmptyState = !svg && !code.trim()
-
   // Live render: validate then render Mermaid whenever code or theme changes
   useEffect(() => {
     let active = true
@@ -195,13 +185,13 @@ export default function App() {
 
   return (
     <main className="mpx-app" data-theme={theme} data-sidebar={sidebarOpen ? 'open' : 'closed'}>
-      <WebToolbar
+      <Toolbar
         theme={theme}
         onToggleTheme={() => setTheme((val) => (val === 'light' ? 'dark' : 'light'))}
         hasSvg={Boolean(svg)}
         onExportSvg={handleExportSvg}
         onExportPng={handleExportPng}
-        openInFigmaUrl={FIGMA_PLUGIN_URL}
+        primaryActionHref={FIGMA_PLUGIN_URL}
       />
 
       <div className="mpx-body">
@@ -347,10 +337,8 @@ export default function App() {
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onLoadSample={() => setCode(DEFAULT_DIAGRAM)}
+          emptyStateVariant="web"
         />
-        {showEmptyState &&
-          canvasEl &&
-          createPortal(<WebEmptyState onLoadSample={() => setCode(DEFAULT_DIAGRAM)} />, canvasEl)}
       </div>
 
       <ImportModal
@@ -362,6 +350,7 @@ export default function App() {
       <AboutModal
         isOpen={aboutOpen}
         onClose={() => setAboutOpen(false)}
+        showPluginLink
       />
     </main>
   )

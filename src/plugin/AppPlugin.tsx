@@ -42,6 +42,12 @@ import {
   type Snapshot,
 } from './liveSync.ts'
 import type { Theme } from '../types/index.ts'
+import {
+  figmaThemeFromClassList,
+  initialTheme,
+  themeAfterEdit,
+  themeOnFigmaChange,
+} from './figmaTheme.ts'
 import type {
   DiagramChanges,
   LinkedDiagram,
@@ -53,7 +59,6 @@ import type {
 const DEFAULT_DIAGRAM = DEFAULT_EXAMPLE.code
 const STORAGE_KEY = 'mermapix:code'
 const LEGACY_STORAGE_KEY = 'mermaid-code'
-const THEME_STORAGE_KEY = 'mermapix:theme'
 
 initMermaid('dark')
 
@@ -65,6 +70,8 @@ interface EditSession {
   editable: boolean
   draftCode: string
   draftTheme: Theme
+  /** Figma's theme when the session started: a different one at the end means Figma was switched meanwhile. */
+  figmaAtStart: Theme | null
   /** Last `update-failed` message that keeps the session open. */
   error?: string
   /**
@@ -128,6 +135,10 @@ const DONE_FEEDBACK_MS = 2000
 const MISSING_NOTICE =
   'That diagram no longer exists. Your text is kept as the current draft.'
 
+function readFigmaTheme(): Theme | null {
+  return figmaThemeFromClassList(document.documentElement.classList)
+}
+
 function postToSandbox(message: UiToSandbox) {
   parent.postMessage({ pluginMessage: message }, '*')
 }
@@ -181,15 +192,11 @@ export default function AppPlugin() {
   const [updating, setUpdating] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
-  const [theme, setTheme] = useState<Theme>(() => {
-    try {
-      const stored = localStorage.getItem(THEME_STORAGE_KEY)
-      if (stored === 'light' || stored === 'dark') return stored
-      return 'dark'
-    } catch {
-      return 'dark'
-    }
-  })
+  // The theme follows Figma's (class on <html>, see figmaTheme.ts) each time the plugin opens and when Figma
+  // switches (not while a diagram is being edited). The toggle changes it for this session only; it is not stored.
+  const [initialFigma] = useState<Theme | null>(readFigmaTheme)
+  const figmaTheme = useRef<Theme | null>(initialFigma)
+  const [theme, setTheme] = useState<Theme>(() => initialTheme(initialFigma))
   const [examplesOpen, setExamplesOpen] = useState(false)
   const examplesRef = useRef<HTMLDivElement>(null)
 
@@ -284,15 +291,21 @@ export default function AppPlugin() {
     }
   }, [code, editing])
 
-  // Persist theme selection across plugin sessions (same rule)
+  // Follow Figma's theme. The class may be there before this script runs or be added a moment later; both
+  // are covered (initial read above, observer here). Only a real change of Figma's theme counts.
   useEffect(() => {
-    if (editing) return
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme)
-    } catch {
-      // Storage unavailable
+    const check = () => {
+      const next = readFigmaTheme()
+      if (next === null || next === figmaTheme.current) return
+      figmaTheme.current = next
+      const editingNow = latest.current.edit !== null
+      setTheme((cur) => themeOnFigmaChange({ current: cur, figma: next, editing: editingNow }))
     }
-  }, [theme, editing])
+    check()
+    const observer = new MutationObserver(check)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
 
   // A syntax error leaves the last good preview in place; never insert or update from it.
   // `awaitingRender` covers the moment right after the editor text was swapped programmatically.
@@ -464,6 +477,7 @@ export default function AppPlugin() {
       editable: diagram.editable,
       draftCode: cur.code,
       draftTheme: cur.theme,
+      figmaAtStart: figmaTheme.current,
       canvas: null,
       result: null,
       undo: null,
@@ -497,12 +511,22 @@ export default function AppPlugin() {
     setSaving(false)
     // Effects later in the same commit (the automatic apply) see that the session is over.
     latest.current = { ...latest.current, edit: null }
+    // Figma's theme if it was switched during the edit, else the theme from before it.
+    const nextTheme = themeAfterEdit({
+      draftTheme: cur.draftTheme,
+      figmaAtStart: cur.figmaAtStart,
+      figmaNow: figmaTheme.current,
+    })
     if (!keepEditor) {
-      if (cur.draftCode !== latest.current.code || cur.draftTheme !== latest.current.theme) {
+      if (cur.draftCode !== latest.current.code || nextTheme !== latest.current.theme) {
         setAwaitingRender(true)
       }
       setCode(cur.draftCode)
-      setTheme(cur.draftTheme)
+      setTheme(nextTheme)
+    } else if (nextTheme !== latest.current.theme) {
+      // The diagram is gone: the typed code stays, only the theme goes back.
+      setAwaitingRender(true)
+      setTheme(nextTheme)
     }
     setEdit(null)
     postToSandbox({ type: 'watch-diagram', id: null })
@@ -881,8 +905,8 @@ export default function AppPlugin() {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
-        width: '100vw',
+        height: '100%',
+        width: '100%',
         overflow: 'hidden',
       }}
     >
@@ -1101,6 +1125,7 @@ export default function AppPlugin() {
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
               onLoadSample={() => typeCode(DEFAULT_DIAGRAM)}
+              emptyStateVariant="plugin"
             />
           </div>
         </div>

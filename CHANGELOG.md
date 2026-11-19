@@ -6,14 +6,35 @@ All notable changes to Mermapix are documented here. The format follows
 
 ## Unreleased
 
+### Added
+- **Edit a diagram after inserting it (plugin).** Every diagram the plugin inserts now remembers its Mermaid code and theme. Select the diagram, or any layer inside it, and the plugin offers **Edit source**; change the code and **Update diagram** regenerates it in place, keeping its position, parent, layer order and layer name. Figma also shows an **Edit diagram** button for a selected diagram. Copies and duplicates are each editable on their own. See [`docs/source-linked-diagrams.md`](docs/source-linked-diagrams.md).
+- **Text edited in Figma goes into the code (plugin).** While a diagram is being edited, a label, table or column name, type, key or comment you change directly on the canvas is written into the code by itself, without reopening the plugin ("Added 1 text edit from Figma to the code." with **Undo**). ERD cells are placed by table and row, node labels by their Mermaid id, everything else only when the text occurs exactly once in the code. Anything that cannot be placed safely is listed for you to type.
+- **Live update (plugin).** While a diagram is being edited, it follows the editor: a short pause in typing regenerates it in Figma, without a toast and without moving your selection. A **Live** switch in the strip turns it off (remembered); live update pauses by itself when the diagram was changed in Figma, waits longer between updates for diagrams that take a while to regenerate, and turns itself off only when each update takes several seconds. **Revert** puts the code and the diagram back to how they were when editing started. Each update is its own undo step in Figma.
+- The line under the plugin editor says what follows your typing: the preview, or the diagram in Figma.
+- **Specific warning before an update replaces manual work (plugin).** If a diagram was changed in Figma, the update names what it would replace ("2 moved or resized layers, 1 restyled layer") and waits for **Update anyway**. When the only changes are text edits you already applied to the code, it updates without asking.
+- Your draft in the plugin editor is kept: loading a diagram's code needs a click, and closing edit mode restores the draft.
+- **Save (plugin).** The button that ends edit mode is now **Save** (disk icon): it brings the diagram in Figma up to date with the code, then leaves edit mode and gives the editor your previous draft back. If the diagram was edited in Figma it asks first (**Replace & save** or **Keep editing**); if the code has a syntax error it asks **Leave anyway** or **Keep editing**; if the update fails it stays in edit mode and shows the error. A diagram inside a component instance, which cannot be updated, gets a ✕ **Close** instead.
+- **The update button shows its state (plugin).** While editing, it reads **Updating…** during an update and **Up to date** when the diagram matches the code and nothing was changed in Figma; otherwise **Update**.
+- **New diagrams are named from their code (plugin).** The layer name comes from the YAML frontmatter `title:`, a `title` directive (sequence, gantt, journey, pie, quadrant, timeline, xychart, C4 and similar), `accTitle:`, or else the diagram type ("Flowchart", "ER diagram", ...). Updates keep the layer's current name, so a rename in Figma is kept.
+
 ### Changed
 - Web app: the main button is now **Open in Figma**. It opens the Mermapix plugin on Figma Community in a new tab (a plain link: it does not copy the code; paste your Mermaid code into the plugin and click Insert). **Copy to Figma** (SVG via the clipboard) is removed: a pasted SVG has no Auto Layout and is far behind what the plugin builds. SVG and PNG downloads stay. The plugin itself is unchanged.
 - Web app: the onboarding card shown when the editor is empty now reads, in step 3, "Open in Figma: Get the Mermapix plugin, paste your code and click Insert".
 - The web app moved to https://mermapix.hisyamakbar.com (Cloudflare); the old mermapix.netlify.app address redirects there. Canonical URL, Open Graph, structured data, `robots.txt`, `sitemap.xml` and the `llms` files use the new address, and the response headers moved from `netlify.toml` to `public/_headers`.
 - README, `llms.txt`, `llms-full.txt` and the structured data point to the Figma Community listing; the README has an install section for the published plugin and keeps the development-plugin steps for contributors.
+- Plugin: **Insert as new** is removed from the editing strip. To branch a diagram, duplicate it in Figma (Cmd+D / Ctrl+D), select the copy and edit it; each copy is linked on its own.
+- Plugin: the SVG and PNG download buttons are hidden. Export the inserted layers with Figma's own Export panel (SVG, PNG, PDF, any scale). The web app keeps its downloads.
+- Plugin: the **Live** switch reads "Live on", "Live off" or "Live paused"; its dot is green when on, hollow when off and amber when paused or slow.
 
 ### Fixed
 - The Load Sample ERD Schema button on the empty canvas now loads the sample into the editor.
+- Plugin: code typed just before finishing edit mode was dropped when **Live** was off, while an update was in flight, or before the preview had rendered: the editor went back to the draft and the diagram was not updated. **Save** now updates the diagram first.
+- Plugin: **Update diagram** clicked right after typing could send the previous preview; an update now waits for the preview of the current code.
+
+### Notes
+- Mermaid code cannot express positions, sizes or manual colors, so those edits are still replaced by an update (after the warning). Diagrams inserted with 1.1.0 or earlier, and diagrams pasted from the web app's former **Copy to Figma**, carry no code and cannot be edited this way.
+- A Mermaid source above about 90 kB is inserted but not stored (Figma limits one plugin data entry to 100 kB); the plugin says so.
+- The plugin manifest gains `relaunchButtons` (the **Edit diagram** button). Network access is unchanged: none.
 
 ## 1.1.0 - 2026-11-06
 

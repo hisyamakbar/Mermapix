@@ -44,6 +44,22 @@ pnpm test:export
 - `MERMAPIX_CODE=<path> pnpm test:unit` runs the plugin tests against another bundle (e.g. the previous `code.js`) to prove a new test fails before the fix. The mock importer reproduces real Figma's inline `<clipPath>` behavior (a visible shape, not a mask).
 - Regenerate a payload: load the `.mmd` in the web app, pick the theme and use the **SVG** export button (what the plugin UI posts).
 
+### Source-linked diagrams (edit after insert)
+How the feature works: [`docs/source-linked-diagrams.md`](../docs/source-linked-diagrams.md). Four suites cover it, none needs Figma:
+
+| Suite | What it proves |
+|---|---|
+| `unit/plugin-source-link.test.mjs` | The code is stored on the root and found from any nested layer; fingerprint rules; `transplantDiagram` keeps the root; insert, selection and update end to end; every failure path leaves the target untouched. |
+| `unit/plugin-snapshot.test.mjs` | Per-layer stamps and text context; every field of the change report; an untouched diagram of every diagram family reports nothing. |
+| `unit/source-patch.test.mjs` | Writing a canvas text edit into Mermaid code, per context kind, including every case that must stay unresolved; the wording of the apply result and confirmation. |
+| `unit/plugin-roundtrip.test.mjs` | The seam between the two halves: an edit on the mock canvas, reported by the sandbox bundle, written into the real example code. |
+| `unit/plugin-watch.test.mjs` | Live link: the sandbox watch (`watch-diagram`, page `nodechange`, debounce), repeated canvas edits written into the code as the UI does it (`pendingEdits`), quiet updates, one undo step per update, an edit made while an update loads fonts. |
+| `unit/live-sync.test.mjs` | Live update rules and wording (`src/plugin/liveSync.ts`). |
+
+- `plugin-mock/session.mjs` starts the bundle once and lets a test send several messages (`send`), change the selection (`select`, fires `selectionchange`) and read what the sandbox posted. It adds a document, a page, `getNodeByIdAsync`, relaunch data and two failure switches (`IMPORT_FAILURE`, `OPTIMIZE_FAILURE`) to make the SVG import or the optimizer throw. `runPlugin` in `figma-mock.mjs` stays the single-message runner of the older suites.
+- The sandbox suites run the built `plugin/code.js`: run `pnpm build:plugin` first. `source-patch.test.mjs` imports the TypeScript directly and needs no build.
+- What the mock cannot show: it does not recompute Auto Layout (growth after a text edit is simulated by hand), it has no undo, and it says nothing about the cost of writing plugin data on every layer. Those are in the manual round below.
+
 ### Export fixtures, viewBox check and colour audit (Phase 10.1)
 - `node tests/export-fixtures.mjs --out <dir> [--shots <dir>] [--only 37,40] [--themes dark]` exports every `figma-fixtures/*.mmd` in both themes through the real **SVG** button and checks that the exported content (client rects of all painted shapes and texts, mapped into SVG user space) lies inside the exported viewBox (1px tolerance; layers wholly outside the box, such as gantt's today marker, are Mermaid clipping them on purpose). Writes `<name>-<theme>.svg`, `viewbox-check.txt` and optionally a PNG per export; exit code 1 on any overflow or leftover `<foreignObject>`. These files are what `fixtures/plugin/*` hold: regenerate a payload by copying the matching `<name>-<theme>.svg` (dark = no suffix, `-light` for light; survey payloads are gzipped).
 - `node tests/color-audit.mjs` (`pnpm test:colors`) also audits `<foreignObject>` HTML labels (`h` column) and the `<text>` of the exported SVG (`x` column, mounted 1:1 on the diagram background).
@@ -99,3 +115,58 @@ Perform this verification after modifying themes, the SVG export pipeline, or th
    - [ ] Text is properly vertically and horizontally centered inside entity cells.
    - [ ] Line arrows, relationship paths, and cardinality notations render crisply.
    - [ ] ERD types, keys (PK, FK, UK), and column notes are preserved.
+
+### Source-linked diagrams (edit after insert)
+
+Run this round after changing `plugin/src/sourceLink.ts`, `snapshot.ts`, `update.ts`, `main.ts` or anything in `src/plugin/`. Use the production plugin (`plugin/manifest.json`), not the test runner: plugin data is private to the plugin id.
+
+Insert and update
+- [ ] Insert a diagram: the strip "Diagram selected" with **Edit source** appears right away, and Figma shows the **Edit diagram** button for the selected diagram.
+- [ ] Select a layer deep inside the diagram: the strip still appears.
+- [ ] **Edit source**, change the code, **Update diagram**: the diagram changes in place (same position, parent, layer order, layer name) and **no** "edited in Figma" question appears. A question here is a false positive of the fingerprint or the stamps.
+- [ ] Undo once in Figma: the previous diagram is back.
+- [ ] Names: a new diagram is named from its code. Frontmatter `title:` or a `title` line in a sequence, gantt or pie (`pie showData title X`) diagram gives that title; without one the diagram type ("Flowchart", "ER diagram", "Sequence diagram"); an ERD with a column named `title` is still "ER diagram".
+- [ ] Rename the diagram layer in Figma, edit the code, update: the new name is kept.
+- [ ] No download menu in the plugin (toolbar and mobile export menu); the web app still downloads SVG and PNG. Export the inserted layers with Figma's Export panel.
+- [ ] The strip has no "Insert as new". Duplicate the diagram (Cmd+D / Ctrl+D), select the copy and edit it: the original is untouched and the copy updates on its own.
+- [ ] Update button (edit mode): "Up to date" (disabled) right after opening or after an update; "Update" after a change in the editor with Live off; "Updating…" (disabled) during an update; "Update" again after moving a layer in Figma.
+- [ ] Save, up to date: leaves edit mode at once and the previous draft comes back.
+- [ ] Save, Live off with typed code: shows "Saving…", the diagram changes, then leaves and the draft comes back.
+- [ ] Save while an update is running (slow diagram) and with code typed during it: the diagram ends up with the last code, then leaves.
+- [ ] Save right after typing, before the preview has rendered: the diagram still gets the typed code.
+- [ ] Save after moving a node in Figma and changing the code: the strip asks **Replace & save** / **Keep editing**. Keep editing leaves everything as is; Replace & save updates and leaves.
+- [ ] Save with a syntax error in the code, or with an empty editor: the strip asks **Leave anyway** / **Keep editing**. Leave anyway keeps the diagram's last update and restores the draft. Fixing the code while it asks closes the question; Save then works normally.
+- [ ] Fix a syntax error and click Save at once (before the preview catches up): no "Leave anyway" question, the fixed code is saved.
+- [ ] Save when the update fails (for example the diagram was deleted or the source is too large): stays in edit mode and shows the error.
+- [ ] A diagram inside a component instance: the button is a ✕ **Close** and only leaves edit mode.
+
+Live link (plugin stays open)
+- [ ] Type in the editor: about a second after you stop, the diagram in Figma changes. No toast, the selection does not jump, the line under the editor reads "The diagram in Figma updates as you type."
+- [ ] Type a syntax error: nothing is sent; fix it: the diagram follows.
+- [ ] Edit a label on the canvas: within a second the code has it and the strip says "Added 1 text edit from Figma to the code." **Undo** takes it out and it is not added again.
+- [ ] Edit the same label a second time, then rename an ERD table and edit a column in it: the code follows each time, without reopening the plugin.
+- [ ] While you type a label on the canvas, the diagram is not regenerated under your cursor.
+- [ ] Move a node, then type in the editor: the confirmation names the move, live update pauses ("Live update is paused") until **Update** / **Update anyway**.
+- [ ] Cmd+Z in Figma after a few live updates: each Cmd+Z takes back one update, and the diagram is never left half regenerated.
+- [ ] **Live** switch off: typing changes only the preview, the label reads "Live off" with a hollow dot ("Live on" with a green dot, "Live paused" with an amber dot after a Figma edit); the choice survives reopening the plugin.
+- [ ] **Revert**: the code and the diagram go back to how they were when editing started.
+- [ ] An ordinary diagram (about 0.8 s per update): live update stays on and simply waits a little longer after you stop typing.
+- [ ] A large diagram: only when each update takes several seconds does live update turn itself off with a note; **Update diagram** still works. The plugin console (Plugins > Development > Show console) logs where the time of a slow update goes.
+- [ ] Start from the **Edit diagram** button with the plugin closed: it opens in edit mode with the diagram's code.
+
+Edits made in Figma
+- [ ] Change a flowchart node label on the canvas with the plugin closed, then **Edit source**: the label is added to the code ("Added 1 text edit from Figma to the code."); **Update diagram** runs without a question.
+- [ ] ERD: rename a column in one table whose name also exists in another table (`id`): only the right table changes in the code. Rename a table title: its relationships follow.
+- [ ] Make a label much longer inside an Auto Layout node or an ERD cell: the report shows the text edit and no "moved or resized layers".
+- [ ] Move a node, recolor a fill, recolor only a stroke, delete a layer, duplicate a layer: each is named in the confirmation before the update.
+
+Copies, components, other places
+- [ ] Duplicate a diagram and edit the copy: the original is untouched.
+- [ ] Turn the diagram into a component (the code must still load), create an instance, update the main component: the instance follows. Select the instance: the code loads, the main button stays **Insert to Canvas**.
+- [ ] A diagram inside an Auto Layout frame and inside a Section updates without breaking the parent.
+- [ ] FigJam: insert, select, edit, update.
+- [ ] A diagram on another page than the current one (start edit mode, switch page, update).
+
+Size and age
+- [ ] A large diagram (a few hundred nodes): insert and **Edit source** stay responsive with the per-layer stamps.
+- [ ] A diagram inserted by an older build (no code): no strip, nothing breaks.

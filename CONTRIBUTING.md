@@ -32,12 +32,17 @@ Read [`AGENTS.md`](AGENTS.md) for the full architecture. The short version:
 1. **Web app** (`src/`): Mermaid renders the diagram, then `buildExportSvg` (`src/export/svg.ts`) writes every computed style onto the SVG and rebuilds each label as absolutely positioned `<tspan>`s so Figma imports editable text. The SVG goes to a download, or to the Figma plugin (step 2).
 2. **Figma plugin** (`plugin/src/`, bundled to `plugin/code.js`): the plugin UI (`src/plugin/`) sends that same SVG to the sandbox, which runs `prepareSvgForFigma` → `figma.createNodeFromSvg` → `optimizeDiagramNodes`. One step per diagram type (`DIAGRAM_STEPS` in `optimize.ts`: ERD, flowchart, sequence, class, state, treemap, railroad, edge labels, then a generic fallback) turns the imported vectors into frames, Auto Layout and named layers.
 
+3. **Source-linked diagrams** (`plugin/src/sourceLink.ts`, `snapshot.ts`, `update.ts`, UI in `src/plugin/`): the plugin stores the Mermaid code on each diagram it inserts, so a selected diagram can be loaded, changed and regenerated in place (live while the plugin is open), and text edited on the canvas is written back into the code. The UI and the sandbox share one typed message contract, `plugin/src/protocol.ts`. Read [`docs/source-linked-diagrams.md`](docs/source-linked-diagrams.md) before changing any of it.
+
 ## Rules that keep the output correct
 
 - **The export pipeline is protected.** Do not change the computed-style capture, the flat `<tspan>` text rewrite in `src/export/svg.ts`, or `htmlLabels: false` in `src/themes/presets.ts`. Other `svg.ts` changes need a maintainer's OK in the issue first, and must be checked on every fixture (`node tests/export-fixtures.mjs`).
 - **Offline only.** The plugin declares `networkAccess: none`. No remote fonts, scripts, stylesheets or fetches; assets the plugin UI uses are imported with `?inline` (it is a single HTML file).
 - **Positions stay where Mermaid put them.** Converters may wrap, merge and rename layers, but every shape and text must keep its bounds (within about 1px) and nothing may be dropped or duplicated.
 - **Generated bundles are committed.** After changing `plugin/src/`, `src/export/`, `src/themes/`, `src/plugin/` or `src/index.css`, run `pnpm build:plugin` and `pnpm build:test-runner` and commit `plugin/` and `plugin-dev/` outputs. CI fails if they are stale.
+- **Stored diagram data must stay readable.** `mermapix:diagram` is versioned (`v: 1`) and lives in users' Figma files long after the build that wrote it. Add a new version next to it; never change what an existing version means.
+- **Writing canvas edits into the code is conservative.** `src/plugin/sourcePatch.ts` applies a text edit only when its place in the code is certain, and reports everything else as unresolved. Never pick between candidates by order of occurrence.
+- **An update must not lose work silently.** The new diagram is built completely before the old one is touched, and a diagram that was changed in Figma is only replaced after the user confirms.
 - No new runtime dependencies without discussing it in an issue first.
 
 ## Fixing a diagram case (the usual workflow)

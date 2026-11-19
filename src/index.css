@@ -2044,6 +2044,207 @@ button, a {
   height: 100%;
 }
 
+/* Source-linked diagrams: slim contextual strip between the tab bar and the editor. It is only
+   rendered while there is something to say, so the plugin keeps its two-row header. */
+.mpx-plugin-app {
+  --strip-warn-bg: #fef3c7;
+  --strip-warn-text: #7c2d12;
+  --strip-warn-edge: #e8c46a;
+  --strip-live-on: #15803d;
+  --strip-warn-dot: #b45309;
+}
+
+.mpx-plugin-app[data-theme="dark"] {
+  --strip-warn-bg: #2b2310;
+  --strip-warn-text: #fcd34d;
+  --strip-warn-edge: #5c4916;
+  --strip-live-on: #4ade80;
+  --strip-warn-dot: #fbbf24;
+}
+
+.mpx-plugin-app .mpx-source-strip {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px 12px;
+  min-height: 36px;
+  justify-content: center;
+  background: var(--panel-bottom);
+  border-bottom: 1px solid var(--panel-border);
+  color: var(--btn-text);
+  font-size: 12px;
+  line-height: 1.4;
+  animation: mpx-strip-in 0.16s ease-out;
+}
+
+.mpx-plugin-app .mpx-source-strip.is-warn {
+  background: var(--strip-warn-bg);
+  border-bottom-color: var(--strip-warn-edge);
+  color: var(--strip-warn-text);
+}
+
+.mpx-plugin-app .mpx-source-strip__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mpx-plugin-app .mpx-source-strip.is-stacked .mpx-source-strip__row {
+  flex-wrap: wrap;
+}
+
+.mpx-plugin-app .mpx-source-strip__icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--focus);
+}
+
+.mpx-plugin-app .mpx-source-strip.is-warn .mpx-source-strip__icon {
+  color: inherit;
+}
+
+.mpx-plugin-app .mpx-source-strip__text {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-weight: 500;
+}
+
+.mpx-plugin-app .mpx-source-strip__text.is-wrap {
+  display: block;
+  flex: 1 1 0;
+}
+
+.mpx-plugin-app .mpx-source-strip.is-stacked .mpx-source-strip__text {
+  flex: 1 1 200px;
+}
+
+.mpx-plugin-app .mpx-source-strip__lead {
+  flex: none;
+  font-weight: 700;
+}
+
+.mpx-plugin-app .mpx-source-strip__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mpx-plugin-app .mpx-source-strip__actions {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mpx-plugin-app .mpx-source-strip.is-stacked .mpx-source-strip__actions {
+  flex-basis: 100%;
+  justify-content: flex-end;
+}
+
+.mpx-plugin-app .mpx-source-strip .text-button {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 10px;
+}
+
+.mpx-plugin-app .mpx-source-strip .icon-button {
+  width: 26px;
+  height: 26px;
+}
+
+.mpx-plugin-app .mpx-source-strip__note {
+  margin: 0;
+  padding-left: 22px;
+  font-size: 11px;
+}
+
+/* The "Live" switch in the Editing row. The label says the state in words; the dot backs it up:
+   solid green = on, hollow neutral = off, solid amber = paused or slow. */
+.mpx-plugin-app .mpx-source-strip__live {
+  gap: 6px;
+}
+
+.mpx-plugin-app .mpx-source-strip__live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  box-sizing: border-box;
+}
+
+.mpx-plugin-app .mpx-source-strip__live[data-live='on'] .mpx-source-strip__live-dot {
+  background: var(--strip-live-on);
+  border-color: var(--strip-live-on);
+}
+
+.mpx-plugin-app .mpx-source-strip__live[data-live='paused'] .mpx-source-strip__live-dot,
+.mpx-plugin-app .mpx-source-strip__live[data-live='slow'] .mpx-source-strip__live-dot {
+  background: var(--strip-warn-dot);
+  border-color: var(--strip-warn-dot);
+}
+
+/* Save: same pill as Live and Revert; busy while the diagram is being written. */
+.mpx-plugin-app .mpx-source-strip__save {
+  gap: 5px;
+}
+
+.mpx-plugin-app .mpx-source-strip__save[aria-busy='true'] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+/* Second line of the strip: what writing the text edits made in Figma into the code did (Phase 12/13). */
+.mpx-plugin-app .mpx-source-strip__follow {
+  padding-top: 4px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.mpx-plugin-app .mpx-source-strip.is-warn .mpx-source-strip__follow {
+  border-top-color: var(--strip-warn-edge);
+}
+
+.mpx-plugin-app .mpx-source-strip__follow .mpx-source-strip__text.is-wrap {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.mpx-plugin-app .mpx-source-strip__follow-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mpx-plugin-app .mpx-source-strip__list {
+  margin: 0;
+  padding: 0 0 0 22px;
+  max-height: 96px;
+  overflow-y: auto;
+  list-style: none;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.mpx-plugin-app .mpx-source-strip__list li {
+  overflow-wrap: anywhere;
+}
+
+@keyframes mpx-strip-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,

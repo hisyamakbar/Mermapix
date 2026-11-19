@@ -5013,6 +5013,505 @@
 		applyRootBackground(rootNode, themeVariables);
 	}
 	//#endregion
+	//#region plugin/src/sourceLink.ts
+	/** Plugin data key holding the JSON payload `{ v: 1, source, theme, type }`. */
+	var DIAGRAM_KEY = "mermapix:diagram";
+	/** Plugin data key holding the structural fingerprint written right after the plugin last built the tree. */
+	var FINGERPRINT_KEY = "mermapix:fingerprint";
+	/** UTF-8 byte length of a string, counted by hand (the sandbox has no guaranteed TextEncoder). */
+	function utf8Length(s) {
+		let bytes = 0;
+		for (let i = 0; i < s.length; i++) {
+			const c = s.charCodeAt(i);
+			if (c < 128) bytes += 1;
+			else if (c < 2048) bytes += 2;
+			else if (c >= 55296 && c <= 56319 && i + 1 < s.length) {
+				const next = s.charCodeAt(i + 1);
+				if (next >= 56320 && next <= 57343) {
+					bytes += 4;
+					i++;
+				} else bytes += 3;
+			} else bytes += 3;
+		}
+		return bytes;
+	}
+	/** The JSON entry to store, or null when it would not fit into one plugin data entry. */
+	function encodeDiagram(d) {
+		if (typeof d.source !== "string") return null;
+		const entry = JSON.stringify({
+			v: 1,
+			source: d.source,
+			theme: d.theme === "dark" ? "dark" : "light",
+			type: d.type || ""
+		});
+		if (utf8Length("mermapix:diagram") + utf8Length(entry) > 9e4) return null;
+		return entry;
+	}
+	/** Parses a stored entry. Garbage, empty values and unknown versions give null; never throws. */
+	function decodeDiagram(raw) {
+		if (typeof raw !== "string" || raw === "") return null;
+		let data;
+		try {
+			data = JSON.parse(raw);
+		} catch (_unused) {
+			return null;
+		}
+		if (!data || typeof data !== "object" || data.v !== 1) return null;
+		if (typeof data.source !== "string") return null;
+		if (data.theme !== "light" && data.theme !== "dark") return null;
+		return {
+			v: 1,
+			source: data.source,
+			theme: data.theme,
+			type: typeof data.type === "string" ? data.type : ""
+		};
+	}
+	function pluginData(node, key) {
+		try {
+			if (node && typeof node.getPluginData === "function") {
+				const v = node.getPluginData(key);
+				return typeof v === "string" ? v : "";
+			}
+		} catch (_unused2) {}
+		return "";
+	}
+	/** The decoded source link stored on exactly this node (not its ancestors), or null. */
+	function readDiagram(node) {
+		return decodeDiagram(pluginData(node, DIAGRAM_KEY));
+	}
+	/** Walks `parent` up from `node` to the first node whose `mermapix:diagram` decodes; null when none. */
+	function findDiagramRoot(node) {
+		let n = node;
+		for (let guard = 0; n && guard < 1e4; guard++) {
+			if (readDiagram(n)) return n;
+			n = n.parent;
+		}
+		return null;
+	}
+	/**
+	* A diagram can be regenerated in place unless its root or any ancestor is a component INSTANCE (the
+	* children of an instance are read-only). The source can still be loaded in that case.
+	*/
+	function editability(node) {
+		let n = node;
+		for (let guard = 0; n && guard < 1e4; guard++) {
+			if (n.type === "INSTANCE") return {
+				editable: false,
+				reason: "instance"
+			};
+			n = n.parent;
+		}
+		return { editable: true };
+	}
+	var FNV_PRIME = 16777619;
+	function fnv1a(s, seed) {
+		let h = seed >>> 0;
+		for (let i = 0; i < s.length; i++) {
+			h ^= s.charCodeAt(i);
+			h = Math.imul(h, FNV_PRIME) >>> 0;
+		}
+		return h;
+	}
+	function hex8(n) {
+		return ("00000000" + (n >>> 0).toString(16)).slice(-8);
+	}
+	/** Rounded number, or '' for anything that is not a finite number (undefined, figma.mixed symbol). */
+	function num(v) {
+		return typeof v === "number" && isFinite(v) ? String(Math.round(v)) : "";
+	}
+	function solidFills(node) {
+		let fills;
+		try {
+			fills = node.fills;
+		} catch (_unused3) {
+			return "";
+		}
+		if (!Array.isArray(fills)) return "";
+		const out = [];
+		for (const p of fills) {
+			if (!p || p.type !== "SOLID" || !p.color) continue;
+			const c = p.color;
+			const op = typeof p.opacity === "number" ? Math.round(p.opacity * 100) : 100;
+			out.push(`${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)},${op}${p.visible === false ? "h" : ""}`);
+		}
+		return out.join(";");
+	}
+	function describe(node, isRoot) {
+		const size = `${num(node.width)}x${num(node.height)}`;
+		const geom = isRoot ? size : `${num(node.x)},${num(node.y)},${size}`;
+		const name = isRoot ? "" : typeof node.name === "string" ? node.name : "";
+		const text = node.type === "TEXT" && typeof node.characters === "string" ? node.characters : "";
+		return `${isRoot ? "ROOT" : node.type}|${name}|${geom}|${text}|${solidFills(node)}`;
+	}
+	/**
+	* Stable hash of the diagram tree: a DFS over the root's descendants (type, name, bounds relative to the
+	* parent rounded to integers, text characters, solid fill colors) plus the root's own size. Excludes the
+	* root's x/y, name and type (FRAME vs COMPONENT). Two independent 32-bit FNV-1a passes make it a 64-bit hex string.
+	*/
+	function fingerprint(root) {
+		const parts = [];
+		const visit = (n, isRoot) => {
+			if (!n || n.removed) return;
+			parts.push(describe(n, isRoot));
+			const kids = n.children;
+			if (Array.isArray(kids)) {
+				parts.push("(");
+				for (const c of kids) visit(c, false);
+				parts.push(")");
+			}
+		};
+		visit(root, true);
+		const s = parts.join("\n");
+		return hex8(fnv1a(s, 2166136261)) + hex8(fnv1a(s, -1623754710));
+	}
+	/** Short text shown next to the relaunch button. */
+	var RELAUNCH_LABEL = "Edit this diagram from its Mermaid source";
+	/**
+	* Records the structural fingerprint and the relaunch button on a diagram root. Call it after the tree
+	* is final. The relaunch API is missing in some editors and in the mock, so it is guarded.
+	*/
+	function stampDiagram(root) {
+		try {
+			root.setPluginData(FINGERPRINT_KEY, fingerprint(root));
+		} catch (_unused4) {}
+		try {
+			if (typeof root.setRelaunchData === "function") root.setRelaunchData({ edit: RELAUNCH_LABEL });
+		} catch (_unused5) {}
+	}
+	/**
+	* Stores the source link on a diagram root (fingerprint and relaunch data included). Returns false and
+	* stores nothing when the entry would exceed the plugin data limit or the node refuses plugin data.
+	*/
+	function storeDiagram(root, d) {
+		const entry = encodeDiagram(d);
+		if (entry === null) return false;
+		try {
+			root.setPluginData(DIAGRAM_KEY, entry);
+		} catch (_unused6) {
+			return false;
+		}
+		stampDiagram(root);
+		return true;
+	}
+	//#endregion
+	//#region plugin/src/snapshot.ts
+	var SNAP_KEY = "mermapix:snap";
+	var TEXT_KEY = "mermapix:text";
+	var COUNT_KEY = "mermapix:count";
+	var KIND_KEY = "mermapix:kind";
+	var NODE_KEY = "mermapix:node";
+	var CLUSTER_KEY = "mermapix:cluster";
+	function data(node, key) {
+		try {
+			if (node && typeof node.getPluginData === "function") {
+				const v = node.getPluginData(key);
+				return typeof v === "string" ? v : "";
+			}
+		} catch (_unused) {}
+		return "";
+	}
+	function put(node, key, value) {
+		try {
+			node.setPluginData(key, value);
+			return true;
+		} catch (_unused2) {
+			return false;
+		}
+	}
+	var liveChildren = (n) => {
+		try {
+			const kids = n && n.children;
+			return Array.isArray(kids) ? kids.filter((c) => c && !c.removed) : [];
+		} catch (_unused3) {
+			return [];
+		}
+	};
+	var int = (v) => typeof v === "number" && isFinite(v) ? String(Math.round(v)) : "";
+	var hex2 = (v) => ("0" + Math.max(0, Math.min(255, Math.round(v * 255))).toString(16)).slice(-2);
+	/** Solid paints of `node[prop]` as "rrggbb[@opacity][h]" joined by commas; '' for none or unreadable (figma.mixed). */
+	function paints(node, prop) {
+		let list;
+		try {
+			list = node[prop];
+		} catch (_unused4) {
+			return "";
+		}
+		if (!Array.isArray(list)) return "";
+		const out = [];
+		for (const p of list) {
+			if (!p || p.type !== "SOLID" || !p.color) continue;
+			const op = typeof p.opacity === "number" ? Math.round(p.opacity * 100) : 100;
+			out.push(hex2(p.color.r) + hex2(p.color.g) + hex2(p.color.b) + (op !== 100 ? "@" + op : "") + (p.visible === false ? "h" : ""));
+		}
+		return out.join(",");
+	}
+	function readSnap(node) {
+		return {
+			x: numOrNull(node.x),
+			y: numOrNull(node.y),
+			w: numOrNull(node.width),
+			h: numOrNull(node.height),
+			fills: paints(node, "fills"),
+			strokes: paints(node, "strokes")
+		};
+	}
+	var numOrNull = (v) => typeof v === "number" && isFinite(v) ? Math.round(v) : null;
+	function encodeSnap(node) {
+		const s = `${int(node.x)},${int(node.y)},${int(node.width)},${int(node.height)}`;
+		const fills = paints(node, "fills");
+		const strokes = paints(node, "strokes");
+		if (strokes !== "") return `${s}|${fills}|${strokes}`;
+		if (fills !== "") return `${s}|${fills}`;
+		return s;
+	}
+	function parseSnap(raw) {
+		if (raw === "") return null;
+		const parts = raw.split("|");
+		const box = parts[0].split(",");
+		if (box.length !== 4) return null;
+		const n = (v) => v === "" || !isFinite(Number(v)) ? null : Number(v);
+		return {
+			x: n(box[0]),
+			y: n(box[1]),
+			w: n(box[2]),
+			h: n(box[3]),
+			fills: parts[1] || "",
+			strokes: parts[2] || ""
+		};
+	}
+	/** Kinds whose label is not written as `<id><opener>label` in the source (class boxes have many texts). */
+	var NO_NODE_CONTEXT = new Set([
+		"Class",
+		"Interface",
+		"Note"
+	]);
+	function directTexts(n) {
+		return liveChildren(n).filter((c) => c.type === "TEXT" && typeof c.characters === "string" && c.characters.trim() !== "");
+	}
+	/**
+	* ERD table card (erd.ts): children[0] is the header frame (title text(s)), children[1] the `Content` frame
+	* holding one `Column: Type | Field Name | Key | Comment` frame per column, each with one cell frame per
+	* attribute row IN SOURCE ORDER (every column gets a cell for every row, empty ones included), so a cell's
+	* index inside its column is the attribute row. A trailing `Row: Additional Details` frame (texts erd.ts could
+	* not classify) gets no context.
+	*/
+	function erdContexts(card, out) {
+		const kids = liveChildren(card);
+		const header = kids.find((c) => typeof c.name === "string" && c.name.indexOf("Header:") === 0);
+		const content = kids.find((c) => c.name === "Content");
+		if (!header) return;
+		const titles = directTexts(header);
+		if (titles.length === 0) return;
+		const entity = titles.map((t) => t.characters.trim()).join(" ");
+		if (titles.length === 1) out.set(titles[0], {
+			kind: "erd-entity",
+			entity
+		});
+		if (!content) return;
+		const COLS = {
+			"Column: Type": "type",
+			"Column: Field Name": "name",
+			"Column: Key": "key",
+			"Column: Comment": "comment"
+		};
+		for (const column of liveChildren(content)) {
+			const col = COLS[column.name];
+			if (!col) continue;
+			liveChildren(column).forEach((cell, row) => {
+				const texts = directTexts(cell);
+				texts.forEach((t, part) => {
+					const ctx = {
+						kind: "erd-attr",
+						entity,
+						row,
+						col
+					};
+					if (texts.length > 1) ctx.part = part;
+					out.set(t, ctx);
+				});
+			});
+		}
+	}
+	/** Where each text layer of a finished diagram came from, for the layers where that is known. */
+	function deriveTextContexts(root) {
+		const out = /* @__PURE__ */ new Map();
+		const visit = (n) => {
+			const kind = data(n, KIND_KEY);
+			if (kind === "ERD Table") {
+				erdContexts(n, out);
+				return;
+			}
+			if (n.type === "FRAME") {
+				const nodeId = data(n, NODE_KEY);
+				const clusterId = data(n, CLUSTER_KEY);
+				if (nodeId !== "" && !NO_NODE_CONTEXT.has(kind)) {
+					const texts = directTexts(n);
+					if (texts.length === 1) out.set(texts[0], {
+						kind: "node",
+						id: nodeId
+					});
+				} else if (nodeId === "" && clusterId !== "" && clusterId.indexOf("#") < 0) {
+					const texts = directTexts(n);
+					if (texts.length === 1) out.set(texts[0], {
+						kind: "cluster",
+						id: clusterId
+					});
+				}
+			}
+			for (const c of liveChildren(n)) visit(c);
+		};
+		visit(root);
+		return out;
+	}
+	/**
+	* Stamps every descendant of `root` (not the root itself) and writes `mermapix:count` on the root. Call it
+	* once the tree is final and BEFORE the fingerprint is written. Returns the number of stamped layers.
+	*/
+	function stampLayers(root) {
+		const contexts = deriveTextContexts(root);
+		let count = 0;
+		const visit = (n) => {
+			for (const c of liveChildren(n)) {
+				if (put(c, "mermapix:snap", encodeSnap(c))) {
+					count++;
+					if (c.type === "TEXT" && typeof c.characters === "string") {
+						const ctx = contexts.get(c);
+						put(c, TEXT_KEY, JSON.stringify(ctx ? {
+							t: c.characters,
+							x: ctx
+						} : { t: c.characters }));
+					}
+				}
+				visit(c);
+			}
+		};
+		visit(root);
+		put(root, COUNT_KEY, String(count));
+		return count;
+	}
+	var isAutoLayout = (n) => {
+		try {
+			return n.layoutMode === "HORIZONTAL" || n.layoutMode === "VERTICAL";
+		} catch (_unused5) {
+			return false;
+		}
+	};
+	function readTextStamp(node) {
+		const raw = data(node, TEXT_KEY);
+		if (raw === "") return null;
+		try {
+			const v = JSON.parse(raw);
+			return v && typeof v.t === "string" ? v : null;
+		} catch (_unused6) {
+			return null;
+		}
+	}
+	/**
+	* What changed on the canvas since `stampLayers` ran. Approximate by design (see `DiagramChanges`):
+	*  - texts: stamped TEXT layers whose characters differ from the stamp, with the stamped context.
+	*  - moved: stamped layers whose rounded x/y/width/height differ, except geometry that merely follows a text
+	*    edit (decision 7: the edited layer itself; the size of its Auto Layout ancestors; the position of every
+	*    child of those ancestors) and children of a moved GROUP, whose coordinates are relative to the nearest
+	*    frame and so shift with it. A GROUP counts only when it was translated (same size): its size follows
+	*    its children, which are counted themselves.
+	*  - restyled: stamped layers whose solid fill or stroke colors differ.
+	*  - added: top-most unstamped layer of each unstamped subtree, plus stamped layers beyond `mermapix:count`.
+	*  - removed: `mermapix:count` minus the stamped layers still present (never negative).
+	*  - other: the Phase 11 fingerprint differs but nothing above explains it; also the answer for a diagram
+	*    without `mermapix:count` (inserted by the Phase 11 build) whose fingerprint differs.
+	*/
+	function diagramChanges(root) {
+		const result = {
+			texts: [],
+			moved: 0,
+			restyled: 0,
+			added: 0,
+			removed: 0,
+			other: false
+		};
+		const storedFp = data(root, FINGERPRINT_KEY);
+		const fpDiffers = storedFp !== "" && storedFp !== fingerprint(root);
+		const countRaw = data(root, COUNT_KEY);
+		const count = countRaw === "" ? NaN : parseInt(countRaw, 10);
+		if (!isFinite(count) || count < 0) {
+			result.other = fpDiffers;
+			return result;
+		}
+		const entries = /* @__PURE__ */ new Map();
+		const edited = /* @__PURE__ */ new Set();
+		let stamped = 0;
+		const visit = (n, underUnstamped) => {
+			for (const c of liveChildren(n)) {
+				const snap = parseSnap(data(c, SNAP_KEY));
+				if (!snap) {
+					if (!underUnstamped) result.added++;
+					visit(c, true);
+					continue;
+				}
+				stamped++;
+				const cur = readSnap(c);
+				entries.set(c, {
+					node: c,
+					snap,
+					dx: cur.x !== null && snap.x !== null ? cur.x - snap.x : 0,
+					dy: cur.y !== null && snap.y !== null ? cur.y - snap.y : 0,
+					resized: cur.w !== null && snap.w !== null && cur.w !== snap.w || cur.h !== null && snap.h !== null && cur.h !== snap.h
+				});
+				if (c.type === "TEXT" && typeof c.characters === "string") {
+					const stamp = readTextStamp(c);
+					if (stamp && stamp.t !== c.characters) {
+						edited.add(c);
+						const change = {
+							from: stamp.t,
+							to: c.characters
+						};
+						if (stamp.x) change.context = stamp.x;
+						result.texts.push(change);
+					}
+				}
+				visit(c, false);
+			}
+		};
+		visit(root, false);
+		if (stamped > count) result.added += stamped - count;
+		result.removed = Math.max(0, count - stamped);
+		const layoutAncestors = /* @__PURE__ */ new Set();
+		for (const t of edited) {
+			let p = t.parent;
+			for (let guard = 0; p && p !== root && guard < 1e4; guard++) {
+				if (isAutoLayout(p)) layoutAncestors.add(p);
+				p = p.parent;
+			}
+		}
+		for (const e of entries.values()) {
+			const n = e.node;
+			const cur = readSnap(n);
+			const sizeDiffers = e.resized;
+			let ownDx = e.dx;
+			let ownDy = e.dy;
+			const parentEntry = n.parent && n.parent.type === "GROUP" ? entries.get(n.parent) : void 0;
+			if (parentEntry && !parentEntry.resized) {
+				ownDx -= parentEntry.dx;
+				ownDy -= parentEntry.dy;
+			}
+			const isEdited = edited.has(n);
+			const posFollowsText = isEdited || n.parent && layoutAncestors.has(n.parent);
+			const sizeFollowsText = isEdited || layoutAncestors.has(n);
+			const posChanged = !posFollowsText && (ownDx !== 0 || ownDy !== 0);
+			if (n.type === "GROUP") {
+				if (posChanged && !sizeDiffers) result.moved++;
+			} else if (posChanged || !sizeFollowsText && sizeDiffers) result.moved++;
+			if (cur.fills !== e.snap.fills || cur.strokes !== e.snap.strokes) result.restyled++;
+		}
+		const explained = result.texts.length + result.moved + result.restyled + result.added + result.removed > 0;
+		result.other = fpDiffers && !explained;
+		return result;
+	}
+	/** True when `changes` reports nothing at all. */
+	function isClean(changes) {
+		return changes.texts.length === 0 && changes.moved === 0 && changes.restyled === 0 && changes.added === 0 && changes.removed === 0 && !changes.other;
+	}
+	//#endregion
 	//#region plugin/src/diagram.ts
 	/** Preload standard fonts so text metrics and property operations never fail. */
 	async function loadDiagramFonts() {
@@ -5061,18 +5560,130 @@
 		if ("children" in n && Array.isArray(n.children)) for (const child of n.children) ensureAllLayersVisible(child);
 	}
 	/**
-	* Imports the UI's SVG payload as editable layers on the current page and runs the optimizer.
-	* Fonts must already be loaded (`loadDiagramFonts`). Returns the diagram root node.
+	* Imports the UI's SVG payload as editable layers and runs the optimizer. The node goes on `msg.parent`
+	* (default: the current page). Fonts must already be loaded (`loadDiagramFonts`). Returns the diagram root node.
+	*
+	* With `source` the Mermaid source is stored on the root (Phase 11), every layer is stamped for change detection
+	* (Phase 12, ./snapshot.ts) and the root gets a relaunch button; read
+	* `getPluginData('mermapix:diagram')` on the result to see whether it fit into plugin data. A failure after the
+	* node was created leaves that node on its parent (the developer test runner inspects it); callers that need
+	* a clean failure remove it themselves.
 	*/
 	function createDiagramNode(msg) {
 		const processedSvg = prepareSvgForFigma(msg.svg);
 		const node = figma.createNodeFromSvg(processedSvg);
 		node.name = msg.name || "Mermapix Diagram";
 		ensureAllLayersVisible(node);
-		figma.currentPage.appendChild(node);
+		(msg.parent || figma.currentPage).appendChild(node);
 		optimizeDiagramNodes(node, msg.themeVariables, diagramTypeFromSvg(msg.svg));
 		ensureAllLayersVisible(node);
+		if (typeof msg.source === "string") {
+			const link = {
+				source: msg.source,
+				theme: msg.theme === "dark" ? "dark" : "light",
+				type: diagramTypeFromSvg(msg.svg)
+			};
+			if (encodeDiagram(link) !== null) stampLayers(node);
+			storeDiagram(node, link);
+		}
 		return node;
+	}
+	//#endregion
+	//#region plugin/src/update.ts
+	function dataKeys(node) {
+		try {
+			if (typeof node.getPluginDataKeys === "function") return node.getPluginDataKeys().filter((k) => typeof k === "string" && k.indexOf("mermapix:") === 0);
+		} catch (_unused) {}
+		return [DIAGRAM_KEY, FINGERPRINT_KEY];
+	}
+	/** Only a frame or a component can have its content swapped (a group would vanish when emptied). */
+	function canTransplant(node) {
+		return !!node && !node.removed && (node.type === "FRAME" || node.type === "COMPONENT");
+	}
+	/** Assigns a root paint/clip property; a node type without it (or a refusing editor) just keeps its value. */
+	function copyProp(target, fresh, prop) {
+		try {
+			const v = fresh[prop];
+			if (v === void 0 || typeof v === "symbol") return;
+			target[prop] = Array.isArray(v) ? v.slice() : v;
+		} catch (_unused2) {}
+	}
+	/** The page a node lives on (the node itself when it is a page); null for detached nodes. */
+	function pageOf(node) {
+		let n = node;
+		for (let guard = 0; n && guard < 1e4; guard++) {
+			if (n.type === "PAGE") return n;
+			n = n.parent;
+		}
+		return null;
+	}
+	/**
+	* Replaces the content of `target` with the content of `fresh` and removes the emptied `fresh`.
+	*
+	* Both are frames and share the same internal coordinate system (children are relative to the root), so each
+	* child keeps its numbers: they are recorded before the move and written back after it, the same
+	* convention as `moveKeepingAbs` in subgraphs.ts, instead of trusting appendChild to preserve them.
+	*
+	* Order is chosen so that a failure leaves the target as it was: the new children are appended first (on
+	* failure they are removed again), the old children are deleted only after every new one is in place.
+	*
+	* Copied from `fresh` to `target`: `fills`, `strokes`, `strokeWeight`, `cornerRadius`, `clipsContent`, size,
+	* and every `mermapix:*` plugin data entry (stale `mermapix:*` keys on the target are cleared first). Not
+	* copied: name, x/y, parent, z-order, opacity, effects, constraints, `layoutSizing*`, exports, relaunch data
+	* (the caller stamps that), and any plugin data without the `mermapix:` prefix.
+	*/
+	function transplantDiagram(target, fresh) {
+		if (!target || !fresh || target === fresh) throw new Error("transplantDiagram: need two distinct nodes");
+		if (!canTransplant(target)) throw new Error("transplantDiagram: target must be a live frame or component");
+		const oldChildren = [...target.children || []];
+		const incoming = [...fresh.children || []];
+		const pos = incoming.map((c) => ({
+			x: c.x,
+			y: c.y
+		}));
+		const prevLayout = target.layoutMode;
+		if (prevLayout !== void 0 && prevLayout !== "NONE") target.layoutMode = "NONE";
+		const moved = [];
+		try {
+			incoming.forEach((c, i) => {
+				target.appendChild(c);
+				moved.push(c);
+				c.x = pos[i].x;
+				c.y = pos[i].y;
+			});
+		} catch (err) {
+			for (const c of moved) try {
+				c.remove();
+			} catch (_unused3) {}
+			if (prevLayout !== void 0 && prevLayout !== "NONE") try {
+				target.layoutMode = prevLayout;
+			} catch (_unused4) {}
+			throw err;
+		}
+		for (const c of oldChildren) try {
+			if (!c.removed) c.remove();
+		} catch (_unused5) {}
+		const w = fresh.width;
+		const h = fresh.height;
+		if (typeof target.resizeWithoutConstraints === "function") target.resizeWithoutConstraints(w, h);
+		else target.resize(w, h);
+		for (const prop of [
+			"fills",
+			"strokes",
+			"strokeWeight",
+			"cornerRadius",
+			"clipsContent"
+		]) copyProp(target, fresh, prop);
+		const freshKeys = dataKeys(fresh);
+		for (const k of dataKeys(target)) if (freshKeys.indexOf(k) < 0) try {
+			target.setPluginData(k, "");
+		} catch (_unused6) {}
+		for (const k of freshKeys) try {
+			target.setPluginData(k, fresh.getPluginData(k));
+		} catch (_unused7) {}
+		try {
+			fresh.remove();
+		} catch (_unused8) {}
 	}
 	//#endregion
 	//#region plugin/src/main.ts
@@ -5081,29 +5692,255 @@
 		height: 680,
 		themeColors: true
 	});
-	figma.ui.onmessage = async (msg) => {
-		if (msg.type === "create-svg" && msg.svg) try {
+	function post(msg) {
+		figma.ui.postMessage(msg);
+	}
+	var errorMessage = (err) => err instanceof Error ? err.message : String(err);
+	/** Updates at least this slow log where their time went. */
+	var SLOW_LOG_MS = 500;
+	/** After an update, canvas events for this long are the update's own changes: the watch skips them. */
+	var SELF_CHANGE_MS = 400;
+	var ignoreWatchUntil = 0;
+	/** The linked diagram that contains the first selected layer, or null. */
+	function selectedDiagram() {
+		try {
+			const first = figma.currentPage.selection[0];
+			if (!first) return null;
+			const root = findDiagramRoot(first);
+			const stored = root && readDiagram(root);
+			if (!root || !stored) return null;
+			const e = editability(root);
+			const out = {
+				id: root.id,
+				name: root.name,
+				source: stored.source,
+				theme: stored.theme,
+				editable: e.editable
+			};
+			if (!e.editable) out.reason = e.reason;
+			return out;
+		} catch (_unused) {
+			return null;
+		}
+	}
+	function postSelection(autoEdit) {
+		const msg = {
+			type: "selection",
+			diagram: selectedDiagram()
+		};
+		if (autoEdit) msg.autoEdit = true;
+		post(msg);
+	}
+	figma.on("selectionchange", () => postSelection());
+	figma.on("currentpagechange", () => postSelection());
+	var autoEditPending = figma.command === "edit";
+	async function createFromSvg(msg) {
+		try {
 			await loadDiagramFonts();
 			const node = createDiagramNode({
 				svg: msg.svg,
 				name: msg.name,
-				themeVariables: msg.themeVariables
+				themeVariables: msg.themeVariables,
+				source: msg.source,
+				theme: msg.theme
 			});
 			const center = figma.viewport.center;
 			node.x = Math.round(center.x - node.width / 2);
 			node.y = Math.round(center.y - node.height / 2);
 			figma.currentPage.selection = [node];
 			figma.viewport.scrollAndZoomIntoView([node]);
-			figma.notify("Mermapix diagram added to canvas");
-			figma.ui.postMessage({ type: "inserted" });
+			const linked = typeof msg.source === "string" && readDiagram(node) !== null;
+			if (typeof msg.source === "string" && !linked) figma.notify("Mermapix diagram added, but its source is too large to store: it cannot be re-edited from Figma", { timeout: 6e3 });
+			else figma.notify("Mermapix diagram added to canvas");
+			post({
+				type: "inserted",
+				linked
+			});
 		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
+			const message = errorMessage(err);
 			figma.notify("Could not create the diagram: " + message, { error: true });
-			figma.ui.postMessage({
+			post({
 				type: "insert-failed",
 				message
 			});
 		}
+	}
+	async function updateFromSvg(msg) {
+		const id = msg.targetId;
+		const started = Date.now();
+		const phases = {};
+		let mark = started;
+		const lap = (name) => {
+			const now = Date.now();
+			phases[name] = now - mark;
+			mark = now;
+		};
+		const quiet = msg.quiet === true;
+		const fail = (reason, message) => {
+			if (reason === "error" && !quiet) figma.notify("Could not update the diagram: " + message, { error: true });
+			post({
+				type: "update-failed",
+				id,
+				reason,
+				message
+			});
+		};
+		let target = null;
+		try {
+			target = await figma.getNodeByIdAsync(id);
+		} catch (_unused2) {}
+		if (!target || target.removed || !decodeDiagram(target.getPluginData("mermapix:diagram"))) return fail("missing", "The diagram is gone or no longer has its source.");
+		if (!editability(target).editable) return fail("instance", "This diagram is inside a component instance and cannot be changed in place.");
+		if (!canTransplant(target)) return fail("error", "The diagram root is not a frame or component.");
+		if (encodeDiagram({
+			source: msg.source,
+			theme: msg.theme
+		}) === null) return fail("error", "The source is too large to store, so this diagram could not be updated in place. Insert it as a new diagram instead.");
+		const page = pageOf(target) || figma.currentPage;
+		let before = /* @__PURE__ */ new Set();
+		let fresh = null;
+		try {
+			if (page !== figma.currentPage && typeof page.loadAsync === "function") await page.loadAsync();
+			await loadDiagramFonts();
+			lap("load");
+			if (target.removed) return fail("missing", "The diagram was deleted while updating.");
+			if (!msg.force) {
+				const changes = diagramChanges(target);
+				lap("check");
+				if (!isClean(changes)) {
+					post({
+						type: "update-needs-confirm",
+						id,
+						changes
+					});
+					return;
+				}
+			}
+			before = new Set(page.children);
+			fresh = createDiagramNode({
+				svg: msg.svg,
+				name: target.name,
+				themeVariables: msg.themeVariables,
+				source: msg.source,
+				theme: msg.theme,
+				parent: page
+			});
+			if (!readDiagram(fresh)) throw new Error("The new diagram could not be linked to its source.");
+			lap("build");
+			transplantDiagram(target, fresh);
+			lap("transplant");
+		} catch (err) {
+			if (before.size > 0) try {
+				for (const c of [...page.children]) if (!before.has(c)) c.remove();
+			} catch (_unused3) {}
+			if (fresh && !fresh.removed) try {
+				fresh.remove();
+			} catch (_unused4) {}
+			return fail("error", errorMessage(err));
+		}
+		stampDiagram(target);
+		lap("stamp");
+		ignoreWatchUntil = Date.now() + SELF_CHANGE_MS;
+		clearTimeout(watchTimer);
+		try {
+			if (typeof figma.commitUndo === "function") figma.commitUndo();
+		} catch (_unused5) {}
+		if (!quiet) {
+			try {
+				if (page === figma.currentPage) figma.currentPage.selection = [target];
+			} catch (_unused6) {}
+			figma.notify("Mermapix diagram updated");
+		}
+		const ms = Date.now() - started;
+		if (ms >= SLOW_LOG_MS) console.log(`[Mermapix] update took ${ms} ms`, phases);
+		post({
+			type: "updated",
+			id,
+			ms
+		});
+		postSelection();
+	}
+	/** Answers `inspect-diagram`: what was changed in Figma on one linked diagram. `null` when it is gone, unlinked or unreadable. */
+	async function inspectDiagram(id) {
+		let changes = null;
+		try {
+			const root = await figma.getNodeByIdAsync(id);
+			if (root && !root.removed && decodeDiagram(root.getPluginData("mermapix:diagram"))) {
+				const page = pageOf(root);
+				if (page && page !== figma.currentPage && typeof page.loadAsync === "function") await page.loadAsync();
+				changes = diagramChanges(root);
+			}
+		} catch (_unused7) {}
+		post({
+			type: "diagram-changes",
+			id,
+			changes
+		});
+	}
+	var WATCH_DEBOUNCE_MS = 300;
+	var watch = null;
+	var watchTimer;
+	var watchRun = 0;
+	/** True when one of the changes is inside the diagram. A deletion cannot be placed any more, so it counts. */
+	function touchesDiagram(event, rootId) {
+		const list = event && event.nodeChanges;
+		if (!Array.isArray(list)) return true;
+		for (const change of list) {
+			if (change.type === "DELETE") return true;
+			try {
+				for (let n = change.node; n; n = n.parent) if (n.id === rootId) return true;
+			} catch (_unused8) {
+				return true;
+			}
+		}
+		return false;
+	}
+	function stopWatching() {
+		watchRun++;
+		clearTimeout(watchTimer);
+		if (!watch) return;
+		try {
+			watch.page.off("nodechange", watch.listener);
+		} catch (_unused9) {}
+		watch = null;
+	}
+	/** Answers `watch-diagram`: reports the diagram now and after every later change to it. `null` stops. */
+	async function watchDiagram(id) {
+		stopWatching();
+		if (!id) return;
+		const run = watchRun;
+		try {
+			const root = await figma.getNodeByIdAsync(id);
+			const page = root && !root.removed ? pageOf(root) : null;
+			if (page && typeof page.on === "function") {
+				if (page !== figma.currentPage && typeof page.loadAsync === "function") await page.loadAsync();
+				if (run !== watchRun) return;
+				const listener = (event) => {
+					if (Date.now() < ignoreWatchUntil) return;
+					if (!touchesDiagram(event, id)) return;
+					clearTimeout(watchTimer);
+					watchTimer = setTimeout(() => inspectDiagram(id), WATCH_DEBOUNCE_MS);
+				};
+				page.on("nodechange", listener);
+				watch = {
+					id,
+					page,
+					listener
+				};
+			}
+		} catch (_unused10) {}
+		if (run !== watchRun) return;
+		await inspectDiagram(id);
+	}
+	figma.ui.onmessage = async (msg) => {
+		if (msg.type === "create-svg" && msg.svg) await createFromSvg(msg);
+		else if (msg.type === "update-svg") await updateFromSvg(msg);
+		else if (msg.type === "request-selection") {
+			const auto = autoEditPending;
+			autoEditPending = false;
+			postSelection(auto);
+		} else if (msg.type === "inspect-diagram") await inspectDiagram(msg.id);
+		else if (msg.type === "watch-diagram") await watchDiagram(msg.id);
 		else if (msg.type === "resize" && msg.width && msg.height) figma.ui.resize(Math.round(msg.width), Math.round(msg.height));
 		else if (msg.type === "close") figma.closePlugin();
 	};

@@ -4,6 +4,9 @@
 import { prepareSvgForFigma } from './svgPrep.ts'
 import { optimizeDiagramNodes } from './optimize.ts'
 import { diagramTypeFromSvg } from './genericGeometry.ts'
+import { encodeDiagram, storeDiagram } from './sourceLink.ts'
+import { stampLayers } from './snapshot.ts'
+import type { DiagramTheme } from './protocol.ts'
 
 /** Preload standard fonts so text metrics and property operations never fail. */
 export async function loadDiagramFonts(): Promise<void> {
@@ -38,13 +41,22 @@ function ensureAllLayersVisible(n: any): void {
 }
 
 /**
- * Imports the UI's SVG payload as editable layers on the current page and runs the optimizer.
- * Fonts must already be loaded (`loadDiagramFonts`). Returns the diagram root node.
+ * Imports the UI's SVG payload as editable layers and runs the optimizer. The node goes on `msg.parent`
+ * (default: the current page). Fonts must already be loaded (`loadDiagramFonts`). Returns the diagram root node.
+ *
+ * With `source` the Mermaid source is stored on the root (Phase 11), every layer is stamped for change detection
+ * (Phase 12, ./snapshot.ts) and the root gets a relaunch button; read
+ * `getPluginData('mermapix:diagram')` on the result to see whether it fit into plugin data. A failure after the
+ * node was created leaves that node on its parent (the developer test runner inspects it); callers that need
+ * a clean failure remove it themselves.
  */
 export function createDiagramNode(msg: {
   svg: string
   name?: string
   themeVariables?: Record<string, any>
+  source?: string
+  theme?: DiagramTheme
+  parent?: any
 }): any {
   // Inline SVG markers only if the UI did not already (avoids stacked duplicates), then give
   // each inlined marker group a unique id so Figma names the layer (it ignores `class`).
@@ -54,10 +66,19 @@ export function createDiagramNode(msg: {
 
   ensureAllLayersVisible(node)
 
-  figma.currentPage.appendChild(node)
+  const parent = msg.parent || figma.currentPage
+  parent.appendChild(node)
 
   // Optimize layers: convert ERD tables to column-based Auto Layout & dissolve redundant groups
   optimizeDiagramNodes(node, msg.themeVariables, diagramTypeFromSvg(msg.svg))
   ensureAllLayersVisible(node)
+
+  // Written last: the fingerprint describes the final tree. It ignores the root's x/y, so positioning the node afterwards is fine.
+  if (typeof msg.source === 'string') {
+    const link = { source: msg.source, theme: msg.theme === 'dark' ? 'dark' : 'light', type: diagramTypeFromSvg(msg.svg) } as const
+    // Phase 12: per-layer stamps (what was generated, where each text came from), only for diagrams that get linked.
+    if (encodeDiagram(link) !== null) stampLayers(node)
+    storeDiagram(node, link)
+  }
   return node
 }

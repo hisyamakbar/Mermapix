@@ -18,14 +18,18 @@ export interface ToolbarProps {
   hasSvg: boolean
   copied: boolean
   onCopyToFigma: () => void
-  onExportSvg: () => void
-  onExportPng: () => void
+  onExportSvg?: () => void
+  onExportPng?: () => void
   primaryActionLabel?: string
   primaryActionShortLabel?: string
   primaryActionCopiedLabel?: string
   primaryActionShortCopiedLabel?: string
   primaryActionTooltip?: string
   primaryActionIcon?: React.ReactNode
+  /** Render the SVG/PNG export controls (desktop tray and mobile menu). The plugin passes false. */
+  showExport?: boolean
+  /** Disable the primary action even when there is a diagram (for example "Up to date", "Updating..."). */
+  primaryActionDisabled?: boolean
 }
 
 export default function Toolbar({
@@ -42,12 +46,14 @@ export default function Toolbar({
   primaryActionShortCopiedLabel,
   primaryActionTooltip,
   primaryActionIcon,
+  showExport = true,
+  primaryActionDisabled = false,
 }: ToolbarProps) {
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!exportMenuOpen) return
+    if (!showExport || !exportMenuOpen) return
     const handleClickOutside = (e: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setExportMenuOpen(false)
@@ -62,7 +68,7 @@ export default function Toolbar({
       window.removeEventListener('mousedown', handleClickOutside)
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [exportMenuOpen])
+  }, [exportMenuOpen, showExport])
 
   const handleThemeKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
@@ -118,30 +124,32 @@ export default function Toolbar({
         </div>
 
         {/* Desktop Export Files Group (34px) */}
-        <div className="control-group export-tray" role="group" aria-label="Export diagram files">
-          <button
-            type="button"
-            className="segmented-btn export-file-btn"
-            onClick={onExportSvg}
-            disabled={!hasSvg}
-            title="Download SVG vector file"
-            aria-label="Download SVG vector"
-          >
-            <Download size={13} aria-hidden="true" />
-            <span className="btn-label">SVG</span>
-          </button>
-          <button
-            type="button"
-            className="segmented-btn export-file-btn"
-            onClick={onExportPng}
-            disabled={!hasSvg}
-            title="Download high-resolution PNG image"
-            aria-label="Download PNG image"
-          >
-            <ImageDown size={13} aria-hidden="true" />
-            <span className="btn-label">PNG</span>
-          </button>
-        </div>
+        {showExport && (
+          <div className="control-group export-tray" role="group" aria-label="Export diagram files">
+            <button
+              type="button"
+              className="segmented-btn export-file-btn"
+              onClick={onExportSvg}
+              disabled={!hasSvg}
+              title="Download SVG vector file"
+              aria-label="Download SVG vector"
+            >
+              <Download size={13} aria-hidden="true" />
+              <span className="btn-label">SVG</span>
+            </button>
+            <button
+              type="button"
+              className="segmented-btn export-file-btn"
+              onClick={onExportPng}
+              disabled={!hasSvg}
+              title="Download high-resolution PNG image"
+              aria-label="Download PNG image"
+            >
+              <ImageDown size={13} aria-hidden="true" />
+              <span className="btn-label">PNG</span>
+            </button>
+          </div>
+        )}
 
         {/* Mobile Single Theme Toggle Button (<= 768px) */}
         <button
@@ -155,63 +163,65 @@ export default function Toolbar({
         </button>
 
         {/* Mobile Export Dropdown Menu (<= 768px) */}
-        <div className="dropdown-wrapper mobile-export-dropdown" ref={exportMenuRef}>
-          <button
-            type="button"
-            className={`icon-button mobile-export-btn ${exportMenuOpen ? 'is-active' : ''}`}
-            onClick={() => setExportMenuOpen((prev) => !prev)}
-            disabled={!hasSvg}
-            aria-haspopup="menu"
-            aria-expanded={exportMenuOpen}
-            aria-label="Export diagram files"
-            title="Download diagram files (SVG, PNG)"
-          >
-            <Download size={14} aria-hidden="true" />
-            <ChevronDown
-              size={11}
-              aria-hidden="true"
-              style={{
-                transition: 'transform 0.15s ease',
-                transform: exportMenuOpen ? 'rotate(180deg)' : 'none',
-              }}
-            />
-          </button>
-          {exportMenuOpen && (
-            <div className="custom-dropdown-menu mobile-export-menu" role="menu">
-              <button
-                type="button"
-                role="menuitem"
-                className="dropdown-menu-item"
-                onClick={() => {
-                  onExportSvg()
-                  setExportMenuOpen(false)
+        {showExport && (
+          <div className="dropdown-wrapper mobile-export-dropdown" ref={exportMenuRef}>
+            <button
+              type="button"
+              className={`icon-button mobile-export-btn ${exportMenuOpen ? 'is-active' : ''}`}
+              onClick={() => setExportMenuOpen((prev) => !prev)}
+              disabled={!hasSvg}
+              aria-haspopup="menu"
+              aria-expanded={exportMenuOpen}
+              aria-label="Export diagram files"
+              title="Download diagram files (SVG, PNG)"
+            >
+              <Download size={14} aria-hidden="true" />
+              <ChevronDown
+                size={11}
+                aria-hidden="true"
+                style={{
+                  transition: 'transform 0.15s ease',
+                  transform: exportMenuOpen ? 'rotate(180deg)' : 'none',
                 }}
-              >
-                <Download size={13} aria-hidden="true" />
-                <span className="menu-item-label">Export SVG (Vector)</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="dropdown-menu-item"
-                onClick={() => {
-                  onExportPng()
-                  setExportMenuOpen(false)
-                }}
-              >
-                <ImageDown size={13} aria-hidden="true" />
-                <span className="menu-item-label">Export PNG (Image)</span>
-              </button>
-            </div>
-          )}
-        </div>
+              />
+            </button>
+            {exportMenuOpen && (
+              <div className="custom-dropdown-menu mobile-export-menu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="dropdown-menu-item"
+                  onClick={() => {
+                    onExportSvg?.()
+                    setExportMenuOpen(false)
+                  }}
+                >
+                  <Download size={13} aria-hidden="true" />
+                  <span className="menu-item-label">Export SVG (Vector)</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="dropdown-menu-item"
+                  onClick={() => {
+                    onExportPng?.()
+                    setExportMenuOpen(false)
+                  }}
+                >
+                  <ImageDown size={13} aria-hidden="true" />
+                  <span className="menu-item-label">Export PNG (Image)</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Primary Flagship Action (34px) */}
         <button
           type="button"
           className={copied ? 'export-button is-copied' : 'export-button'}
           onClick={onCopyToFigma}
-          disabled={!hasSvg}
+          disabled={!hasSvg || primaryActionDisabled}
           title={primaryActionTooltip || 'Paste into Figma (Cmd/Ctrl+V) for editable vectors. For native Auto Layout, use the Mermapix Figma Plugin!'}
           aria-label={copied ? (primaryActionCopiedLabel || 'Copied to clipboard! Ready to paste into Figma') : (primaryActionLabel || 'Copy to Figma')}
         >

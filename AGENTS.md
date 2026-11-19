@@ -3,7 +3,7 @@
 **Mermapix** — Mermaid to Editable Figma. Paste Mermaid diagrams (ERD-first), DBML, or SQL schemas and get editable Figma vector layers with native Auto Layout, not flat images.
 
 - Maintainers keep the roadmap, phase checklist and decision history in `plans/mermapix-plan.md` (+ `plans/archive/`). `plans/` is maintainer-local and not part of the public repository; when it exists, read its "Agent Rules" section before any modifications and update its checklist when a phase is done.
-- Contributors without `plans/`: this file, [`tests/README.md`](tests/README.md) and [`CHANGELOG.md`](CHANGELOG.md) describe the architecture, the test harness and what changed.
+- Contributors without `plans/`: this file, [`tests/README.md`](tests/README.md) and [`CHANGELOG.md`](CHANGELOG.md) describe the architecture, the test harness and what changed. [`docs/source-linked-diagrams.md`](docs/source-linked-diagrams.md) describes how an inserted diagram stays linked to its Mermaid code (edit after insert, update in place, canvas edits applied back to the code).
 
 ---
 
@@ -32,7 +32,7 @@ Mermapix/
 │   ├── links.ts                    # FIGMA_PLUGIN_URL (Figma Community listing)
 │   ├── vite-env.d.ts               # Vite client types (?raw imports)
 │   ├── components/                 # UI components
-│   │   ├── Toolbar.tsx             # Plugin toolbar (shared component used by src/plugin/AppPlugin.tsx): brand logo, theme toggle, export, primary action
+│   │   ├── Toolbar.tsx             # Plugin toolbar (shared component used by src/plugin/AppPlugin.tsx): brand logo, theme toggle, export (hidden in the plugin: `showExport`), primary action (Insert / Update with its states: `primaryActionDisabled`)
 │   │   ├── WebToolbar.tsx          # Web app toolbar (fork of Toolbar.tsx): theme toggle, SVG/PNG downloads, Open in Figma (red, plain link to the Community plugin in a new tab)
 │   │   ├── FigmaIcon.tsx           # Lucide-style Figma mono-outline icon (lucide ISC); used only to refer to Figma
 │   │   ├── EditorPanel.tsx         # Sidebar editor container with unified mobile/desktop toolbar
@@ -60,6 +60,14 @@ Mermapix/
 │   │   └── presets.ts              # Theme variables (light/dark, contrast-audited), categorical palette, railroad colors, Mermaid initialization
 │   ├── types/
 │   │   └── index.ts                # Global type contracts (Theme, ZoomState, TableNaming)
+│   ├── plugin/                     # Figma plugin UI (built into plugin/ui.html)
+│   │   ├── index.html / main.tsx   # Plugin UI entry
+│   │   ├── AppPlugin.tsx           # Plugin app: editor, preview, insert, edit mode for source-linked diagrams (live update queue, automatic apply)
+│   │   ├── SourceLinkStrip.tsx     # Contextual strip: "Diagram selected", "Editing: ..." with Live switch and Revert, Save (✕ Close in a component instance), apply result with Undo, Save confirmations
+│   │   ├── sourcePatch.ts          # Pure: applyTextChanges, writes text edited on the canvas back into Mermaid code
+│   │   ├── changeSummary.ts        # Pure: pendingEdits (canvas edits restated against the current code), wording of the apply result and the update confirmation
+│   │   ├── liveSync.ts             # Pure: live update rules (when an update is due, slow detection, Live switch, editor hint)
+│   │   └── diagramName.ts          # Pure: layer name of a new diagram, from its code (frontmatter title, title directive, accTitle, diagram type)
 │   ├── utils/
 │   │   └── sanitize.ts             # AI markdown fence sanitizer
 │   └── examples/                   # Built-in diagram templates (?raw imports)
@@ -69,9 +77,13 @@ Mermapix/
 │       ├── flowchart-sitemap.mmd   # Generic website sitemap diagram
 │       └── index.ts                # Examples registry
 ├── plugin/                         # Companion Figma Plugin
-│   ├── manifest.json               # Figma Plugin manifest (Figma Plugin API v1)
+│   ├── manifest.json               # Figma Plugin manifest (Figma Plugin API v1; relaunch button "Edit diagram")
 │   ├── src/                        # Plugin sandbox TypeScript modules (bundled to code.js)
-│   │   ├── main.ts                 # Entry: figma.showUI + figma.ui.onmessage
+│   │   ├── main.ts                 # Entry: figma.showUI + message handlers (insert, selection, watch/inspect, update in place, live updates)
+│   │   ├── protocol.ts             # Types only: UI <-> sandbox messages, LinkedDiagram, TextContext, DiagramChanges
+│   │   ├── sourceLink.ts           # Pure: store/find the Mermaid source on the diagram root, fingerprint, editability
+│   │   ├── snapshot.ts             # Pure: per-layer stamps, text context (ERD row/column, node id), diagramChanges
+│   │   ├── update.ts               # Pure: transplantDiagram, swaps a root's content in place (root node is kept)
 │   │   ├── diagram.ts              # Shared fonts + createDiagramNode (prepareSvgForFigma -> createNodeFromSvg -> optimize); also used by plugin-dev
 │   │   ├── optimize.ts             # optimizeDiagramNodes orchestrator + DIAGRAM_STEPS registry
 │   │   ├── erd.ts                  # ERD entity detection + native Auto Layout table conversion
@@ -102,12 +114,14 @@ Mermapix/
 │   ├── og-image.jpg                # OpenGraph social preview image (1200x630)
 │   └── logo/                       # mermapix-icon.png (256px) + light/dark wordmark lockup SVGs (embedded WebP icon)
 ├── tests/                          # Test harness & fixtures
-│   ├── plugin-mock/                # In-memory mock Figma + synthetic ERD scene used by tests/unit/plugin-harness.test.mjs
+│   ├── plugin-mock/                # In-memory mock Figma + synthetic ERD scene used by tests/unit/plugin-harness.test.mjs; session.mjs runs several messages (insert, select, update) against one plugin start
 │   ├── export-svg.mjs              # Headless Chrome regression runner via CDP
 │   ├── fixtures/                   # Mermaid sample files for regression
 │   ├── baseline/                   # Verified baseline SVG exports
 │   ├── unit/                       # Converter & sanitizer unit tests (node --test)
 │   └── README.md                   # Automated & manual Figma testing guidelines
+├── docs/
+│   └── source-linked-diagrams.md   # Edit after insert: stored data format, update in place, change detection, write-back rules
 ├── plans/                          # Project plans and decision archives
 │   ├── mermapix-plan.md            # Roadmap, phase checklist, and architectural rules
 │   └── research-competitors.md     # Market and technical competitor research
@@ -132,6 +146,15 @@ Mermapix/
 7. **Offline, no network**: the plugin declares `networkAccess: none` and the listing promises 100% offline. Never add a remote font, script, stylesheet or fetch. Fonts are self-hosted woff2 in `src/assets/fonts/` (inlined into the plugin UI by `assetsInlineLimit`); `scripts/build-plugin.mjs` also strips any remote CSS `@import` from the plugin build.
 8. **Web-only changes stay out of the plugin bundle**: the plugin UI imports shared components (`Toolbar`, `Canvas`, `CanvasEmptyState`, `EditorPanel`, `AboutModal`, ...) and `src/index.css`. A change meant only for the web app goes into web-only files (`WebToolbar.tsx`, `web.css`, `App.tsx`), so `pnpm build:plugin` stays byte-identical and the published plugin is not affected until the next plugin release.
 9. **Generated bundles are committed**: `plugin/code.js`, `plugin/ui.html`, `plugin-dev/code.js`, `plugin-dev/ui.html`. After changing `plugin/src/`, `src/export/`, `src/themes/`, `src/plugin/`, `src/index.css` or a fixture, run `pnpm build:plugin` and `pnpm build:test-runner` and commit the outputs, or Figma keeps running the old code.
+10. **Source-linked diagrams** (see `docs/source-linked-diagrams.md`):
+   - The stored format is permanent. `mermapix:diagram` (`{ v: 1, source, theme, type }`) lives in users' Figma files; later builds must keep reading `v: 1`. Add a new version, never redefine one.
+   - An update keeps the root node (`transplantDiagram`): never replace it with a new node, or position, layer order and component instances are lost.
+   - An update is transactional: build the new diagram completely before touching the target, and ask before replacing a diagram that was changed in Figma.
+   - `src/plugin/sourcePatch.ts` stays conservative: apply a canvas text edit only when its place in the code is certain, report the rest as unresolved, never choose by order of occurrence.
+   - The UI and the sandbox change together through `plugin/src/protocol.ts`; a new message or field goes there first.
+   - The editor draft is never overwritten without a user action, and is not persisted while a linked diagram is being edited. Inside edit mode the code belongs to the diagram: canvas text edits are written into it (with Undo); the remembered draft is never touched.
+   - Live update never replaces changes made in Figma: a live (`quiet`) update that meets `update-needs-confirm` pauses live update until the user clicks Update. A code change that came from the canvas never triggers a live update. One update in flight at a time, always built from a preview of exactly the editor's code.
+   - Finishing edit mode (Save) never drops typed code: it updates the diagram first, asks before replacing Figma edits, and asks before leaving with code that cannot be rendered.
 
 ## Dependencies
 

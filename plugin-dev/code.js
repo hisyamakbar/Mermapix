@@ -5013,6 +5013,298 @@
 		applyRootBackground(rootNode, themeVariables);
 	}
 	//#endregion
+	//#region plugin/src/sourceLink.ts
+	/** Plugin data key holding the JSON payload `{ v: 1, source, theme, type }`. */
+	var DIAGRAM_KEY = "mermapix:diagram";
+	/** Plugin data key holding the structural fingerprint written right after the plugin last built the tree. */
+	var FINGERPRINT_KEY = "mermapix:fingerprint";
+	/** UTF-8 byte length of a string, counted by hand (the sandbox has no guaranteed TextEncoder). */
+	function utf8Length(s) {
+		let bytes = 0;
+		for (let i = 0; i < s.length; i++) {
+			const c = s.charCodeAt(i);
+			if (c < 128) bytes += 1;
+			else if (c < 2048) bytes += 2;
+			else if (c >= 55296 && c <= 56319 && i + 1 < s.length) {
+				const next = s.charCodeAt(i + 1);
+				if (next >= 56320 && next <= 57343) {
+					bytes += 4;
+					i++;
+				} else bytes += 3;
+			} else bytes += 3;
+		}
+		return bytes;
+	}
+	/** The JSON entry to store, or null when it would not fit into one plugin data entry. */
+	function encodeDiagram(d) {
+		if (typeof d.source !== "string") return null;
+		const entry = JSON.stringify({
+			v: 1,
+			source: d.source,
+			theme: d.theme === "dark" ? "dark" : "light",
+			type: d.type || ""
+		});
+		if (utf8Length("mermapix:diagram") + utf8Length(entry) > 9e4) return null;
+		return entry;
+	}
+	var FNV_PRIME = 16777619;
+	function fnv1a(s, seed) {
+		let h = seed >>> 0;
+		for (let i = 0; i < s.length; i++) {
+			h ^= s.charCodeAt(i);
+			h = Math.imul(h, FNV_PRIME) >>> 0;
+		}
+		return h;
+	}
+	function hex8(n) {
+		return ("00000000" + (n >>> 0).toString(16)).slice(-8);
+	}
+	/** Rounded number, or '' for anything that is not a finite number (undefined, figma.mixed symbol). */
+	function num(v) {
+		return typeof v === "number" && isFinite(v) ? String(Math.round(v)) : "";
+	}
+	function solidFills(node) {
+		let fills;
+		try {
+			fills = node.fills;
+		} catch (_unused3) {
+			return "";
+		}
+		if (!Array.isArray(fills)) return "";
+		const out = [];
+		for (const p of fills) {
+			if (!p || p.type !== "SOLID" || !p.color) continue;
+			const c = p.color;
+			const op = typeof p.opacity === "number" ? Math.round(p.opacity * 100) : 100;
+			out.push(`${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)},${op}${p.visible === false ? "h" : ""}`);
+		}
+		return out.join(";");
+	}
+	function describe(node, isRoot) {
+		const size = `${num(node.width)}x${num(node.height)}`;
+		const geom = isRoot ? size : `${num(node.x)},${num(node.y)},${size}`;
+		const name = isRoot ? "" : typeof node.name === "string" ? node.name : "";
+		const text = node.type === "TEXT" && typeof node.characters === "string" ? node.characters : "";
+		return `${isRoot ? "ROOT" : node.type}|${name}|${geom}|${text}|${solidFills(node)}`;
+	}
+	/**
+	* Stable hash of the diagram tree: a DFS over the root's descendants (type, name, bounds relative to the
+	* parent rounded to integers, text characters, solid fill colors) plus the root's own size. Excludes the
+	* root's x/y, name and type (FRAME vs COMPONENT). Two independent 32-bit FNV-1a passes make it a 64-bit hex string.
+	*/
+	function fingerprint(root) {
+		const parts = [];
+		const visit = (n, isRoot) => {
+			if (!n || n.removed) return;
+			parts.push(describe(n, isRoot));
+			const kids = n.children;
+			if (Array.isArray(kids)) {
+				parts.push("(");
+				for (const c of kids) visit(c, false);
+				parts.push(")");
+			}
+		};
+		visit(root, true);
+		const s = parts.join("\n");
+		return hex8(fnv1a(s, 2166136261)) + hex8(fnv1a(s, -1623754710));
+	}
+	/** Short text shown next to the relaunch button. */
+	var RELAUNCH_LABEL = "Edit this diagram from its Mermaid source";
+	/**
+	* Records the structural fingerprint and the relaunch button on a diagram root. Call it after the tree
+	* is final. The relaunch API is missing in some editors and in the mock, so it is guarded.
+	*/
+	function stampDiagram(root) {
+		try {
+			root.setPluginData(FINGERPRINT_KEY, fingerprint(root));
+		} catch (_unused4) {}
+		try {
+			if (typeof root.setRelaunchData === "function") root.setRelaunchData({ edit: RELAUNCH_LABEL });
+		} catch (_unused5) {}
+	}
+	/**
+	* Stores the source link on a diagram root (fingerprint and relaunch data included). Returns false and
+	* stores nothing when the entry would exceed the plugin data limit or the node refuses plugin data.
+	*/
+	function storeDiagram(root, d) {
+		const entry = encodeDiagram(d);
+		if (entry === null) return false;
+		try {
+			root.setPluginData(DIAGRAM_KEY, entry);
+		} catch (_unused6) {
+			return false;
+		}
+		stampDiagram(root);
+		return true;
+	}
+	var TEXT_KEY = "mermapix:text";
+	var COUNT_KEY = "mermapix:count";
+	var KIND_KEY = "mermapix:kind";
+	var NODE_KEY = "mermapix:node";
+	var CLUSTER_KEY = "mermapix:cluster";
+	function data(node, key) {
+		try {
+			if (node && typeof node.getPluginData === "function") {
+				const v = node.getPluginData(key);
+				return typeof v === "string" ? v : "";
+			}
+		} catch (_unused) {}
+		return "";
+	}
+	function put(node, key, value) {
+		try {
+			node.setPluginData(key, value);
+			return true;
+		} catch (_unused2) {
+			return false;
+		}
+	}
+	var liveChildren = (n) => {
+		try {
+			const kids = n && n.children;
+			return Array.isArray(kids) ? kids.filter((c) => c && !c.removed) : [];
+		} catch (_unused3) {
+			return [];
+		}
+	};
+	var int = (v) => typeof v === "number" && isFinite(v) ? String(Math.round(v)) : "";
+	var hex2 = (v) => ("0" + Math.max(0, Math.min(255, Math.round(v * 255))).toString(16)).slice(-2);
+	/** Solid paints of `node[prop]` as "rrggbb[@opacity][h]" joined by commas; '' for none or unreadable (figma.mixed). */
+	function paints(node, prop) {
+		let list;
+		try {
+			list = node[prop];
+		} catch (_unused4) {
+			return "";
+		}
+		if (!Array.isArray(list)) return "";
+		const out = [];
+		for (const p of list) {
+			if (!p || p.type !== "SOLID" || !p.color) continue;
+			const op = typeof p.opacity === "number" ? Math.round(p.opacity * 100) : 100;
+			out.push(hex2(p.color.r) + hex2(p.color.g) + hex2(p.color.b) + (op !== 100 ? "@" + op : "") + (p.visible === false ? "h" : ""));
+		}
+		return out.join(",");
+	}
+	function encodeSnap(node) {
+		const s = `${int(node.x)},${int(node.y)},${int(node.width)},${int(node.height)}`;
+		const fills = paints(node, "fills");
+		const strokes = paints(node, "strokes");
+		if (strokes !== "") return `${s}|${fills}|${strokes}`;
+		if (fills !== "") return `${s}|${fills}`;
+		return s;
+	}
+	/** Kinds whose label is not written as `<id><opener>label` in the source (class boxes have many texts). */
+	var NO_NODE_CONTEXT = new Set([
+		"Class",
+		"Interface",
+		"Note"
+	]);
+	function directTexts(n) {
+		return liveChildren(n).filter((c) => c.type === "TEXT" && typeof c.characters === "string" && c.characters.trim() !== "");
+	}
+	/**
+	* ERD table card (erd.ts): children[0] is the header frame (title text(s)), children[1] the `Content` frame
+	* holding one `Column: Type | Field Name | Key | Comment` frame per column, each with one cell frame per
+	* attribute row IN SOURCE ORDER (every column gets a cell for every row, empty ones included), so a cell's
+	* index inside its column is the attribute row. A trailing `Row: Additional Details` frame (texts erd.ts could
+	* not classify) gets no context.
+	*/
+	function erdContexts(card, out) {
+		const kids = liveChildren(card);
+		const header = kids.find((c) => typeof c.name === "string" && c.name.indexOf("Header:") === 0);
+		const content = kids.find((c) => c.name === "Content");
+		if (!header) return;
+		const titles = directTexts(header);
+		if (titles.length === 0) return;
+		const entity = titles.map((t) => t.characters.trim()).join(" ");
+		if (titles.length === 1) out.set(titles[0], {
+			kind: "erd-entity",
+			entity
+		});
+		if (!content) return;
+		const COLS = {
+			"Column: Type": "type",
+			"Column: Field Name": "name",
+			"Column: Key": "key",
+			"Column: Comment": "comment"
+		};
+		for (const column of liveChildren(content)) {
+			const col = COLS[column.name];
+			if (!col) continue;
+			liveChildren(column).forEach((cell, row) => {
+				const texts = directTexts(cell);
+				texts.forEach((t, part) => {
+					const ctx = {
+						kind: "erd-attr",
+						entity,
+						row,
+						col
+					};
+					if (texts.length > 1) ctx.part = part;
+					out.set(t, ctx);
+				});
+			});
+		}
+	}
+	/** Where each text layer of a finished diagram came from, for the layers where that is known. */
+	function deriveTextContexts(root) {
+		const out = /* @__PURE__ */ new Map();
+		const visit = (n) => {
+			const kind = data(n, KIND_KEY);
+			if (kind === "ERD Table") {
+				erdContexts(n, out);
+				return;
+			}
+			if (n.type === "FRAME") {
+				const nodeId = data(n, NODE_KEY);
+				const clusterId = data(n, CLUSTER_KEY);
+				if (nodeId !== "" && !NO_NODE_CONTEXT.has(kind)) {
+					const texts = directTexts(n);
+					if (texts.length === 1) out.set(texts[0], {
+						kind: "node",
+						id: nodeId
+					});
+				} else if (nodeId === "" && clusterId !== "" && clusterId.indexOf("#") < 0) {
+					const texts = directTexts(n);
+					if (texts.length === 1) out.set(texts[0], {
+						kind: "cluster",
+						id: clusterId
+					});
+				}
+			}
+			for (const c of liveChildren(n)) visit(c);
+		};
+		visit(root);
+		return out;
+	}
+	/**
+	* Stamps every descendant of `root` (not the root itself) and writes `mermapix:count` on the root. Call it
+	* once the tree is final and BEFORE the fingerprint is written. Returns the number of stamped layers.
+	*/
+	function stampLayers(root) {
+		const contexts = deriveTextContexts(root);
+		let count = 0;
+		const visit = (n) => {
+			for (const c of liveChildren(n)) {
+				if (put(c, "mermapix:snap", encodeSnap(c))) {
+					count++;
+					if (c.type === "TEXT" && typeof c.characters === "string") {
+						const ctx = contexts.get(c);
+						put(c, TEXT_KEY, JSON.stringify(ctx ? {
+							t: c.characters,
+							x: ctx
+						} : { t: c.characters }));
+					}
+				}
+				visit(c);
+			}
+		};
+		visit(root);
+		put(root, COUNT_KEY, String(count));
+		return count;
+	}
+	//#endregion
 	//#region plugin/src/diagram.ts
 	/** Preload standard fonts so text metrics and property operations never fail. */
 	async function loadDiagramFonts() {
@@ -5061,17 +5353,32 @@
 		if ("children" in n && Array.isArray(n.children)) for (const child of n.children) ensureAllLayersVisible(child);
 	}
 	/**
-	* Imports the UI's SVG payload as editable layers on the current page and runs the optimizer.
-	* Fonts must already be loaded (`loadDiagramFonts`). Returns the diagram root node.
+	* Imports the UI's SVG payload as editable layers and runs the optimizer. The node goes on `msg.parent`
+	* (default: the current page). Fonts must already be loaded (`loadDiagramFonts`). Returns the diagram root node.
+	*
+	* With `source` the Mermaid source is stored on the root (Phase 11), every layer is stamped for change detection
+	* (Phase 12, ./snapshot.ts) and the root gets a relaunch button; read
+	* `getPluginData('mermapix:diagram')` on the result to see whether it fit into plugin data. A failure after the
+	* node was created leaves that node on its parent (the developer test runner inspects it); callers that need
+	* a clean failure remove it themselves.
 	*/
 	function createDiagramNode(msg) {
 		const processedSvg = prepareSvgForFigma(msg.svg);
 		const node = figma.createNodeFromSvg(processedSvg);
 		node.name = msg.name || "Mermapix Diagram";
 		ensureAllLayersVisible(node);
-		figma.currentPage.appendChild(node);
+		(msg.parent || figma.currentPage).appendChild(node);
 		optimizeDiagramNodes(node, msg.themeVariables, diagramTypeFromSvg(msg.svg));
 		ensureAllLayersVisible(node);
+		if (typeof msg.source === "string") {
+			const link = {
+				source: msg.source,
+				theme: msg.theme === "dark" ? "dark" : "light",
+				type: diagramTypeFromSvg(msg.svg)
+			};
+			if (encodeDiagram(link) !== null) stampLayers(node);
+			storeDiagram(node, link);
+		}
 		return node;
 	}
 	//#endregion

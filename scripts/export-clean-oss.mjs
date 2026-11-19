@@ -29,6 +29,7 @@ const INCLUDED_PATHS = [
   'public',
   'scripts',
   'tests',
+  'docs',
   'index.html',
   'vite.config.ts',
   'vite.plugin.config.ts',

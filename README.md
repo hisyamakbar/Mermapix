@@ -34,6 +34,7 @@ Diagrams go into Figma through the plugin: native frames, Auto Layout ERD tables
 
 - 🏗️ **Native Auto Layout ERD Frames** *(Plugin)*: Converts database entities into vertical Auto Layout frames. Add or delete fields directly in Figma and the container card responds naturally.
 - 🧩 **Native frames for every diagram type** *(Plugin)*: flowchart and sitemap nodes and subgraphs, sequence participants, notes and alt/loop blocks, class boxes, states, treemap sections and railroad boxes all become frames with fill + border merged; connectors are grouped as `Edge: A → B`. Gantt, pie, mindmap, timeline, journey, C4 and the rest keep their geometry with semantic layer names.
+- 🔁 **Edit after insert** *(Plugin, unreleased)*: every inserted diagram remembers its Mermaid code. Select it in Figma, choose **Edit source**, and the diagram follows your code as you type, in place. Text you change directly on the canvas goes back into the code. See [Editing a diagram after inserting it](#-editing-a-diagram-after-inserting-it).
 - 🧼 **Clean Layers (No Redundant Groups)**: Dissolves nested SVG wrapper groups so you can double-click and edit text instantly.
 - 🗄️ **DBML & SQL Schema Import**: Instantly convert raw DBML or SQL `CREATE TABLE` definitions (Postgres/MySQL) into structured Mermaid ERD diagrams.
 - 🎨 **Light & Dark Theme Sync**: Toggle between Light (clean neutral) and Dark (midnight cyan). A 12-color categorical palette gives treemaps, mindmaps, timelines, pies and git graphs distinct colors, and every theme is checked by an automated contrast audit (WCAG AA: text ≥ 4.5:1, lines ≥ 3:1).
@@ -113,7 +114,44 @@ For contributors, or to try a change before it is published, run the plugin as a
 
 To test a specific release instead, download `mermapix-figma-plugin-<version>.zip` from the [releases page](https://github.com/hisyamakbar/Mermapix/releases), unzip it and import its `manifest.json` the same way.
 
+> The published plugin (v1.1.0) does not include [editing a diagram after inserting it](#-editing-a-diagram-after-inserting-it) yet. To try it, run the plugin from source as above.
+
 **Regression pass in real Figma**: import `plugin-dev/manifest.json` (Mermapix Test Runner, developer only) and click **Run all**. It inserts every `tests/figma-fixtures/*.mmd` in light and dark on a new page and stores an audit you can read back with `tests/figma-read-audit.js` (see `tests/README.md`).
+
+---
+
+## 🔁 Editing a diagram after inserting it
+
+*Plugin only, unreleased: run the plugin from this repository to use it.*
+
+1. **Insert** a diagram with the plugin. Its Mermaid code and theme are stored on the diagram, inside your Figma file.
+2. **Select** the diagram or any layer inside it. The plugin shows "Diagram selected" with **Edit source**. Figma also shows an **Edit diagram** button for the selected diagram.
+3. **Change the code.** With **Live** on (the default) the diagram follows as you type; otherwise click **Update diagram**. The diagram is regenerated where it is: same position, parent, layer order and layer name. Each update is one undo step in Figma.
+4. **Change text on the canvas** while the plugin is open: it is written into the code by itself ("Added 1 text edit from Figma to the code.", with **Undo**).
+5. **Save** updates the diagram with the code if it is not up to date yet, then gives the editor your previous draft back. It asks first when that would replace edits made in Figma, or when the code has an error. **Revert** puts the code and the diagram back to how they were when you started.
+
+What happens to changes you made directly in Figma:
+
+| Change made in Figma | On update |
+|---|---|
+| Text (labels, table and column names, types, keys, comments) | Written into the code while you edit, so the update keeps it |
+| Moved, resized, added or deleted layers | Replaced, after a warning that names them (live update pauses until you decide) |
+| Fill and stroke colors | Replaced, after a warning that names them (live update pauses until you decide) |
+
+Mermaid computes the layout again on every render, so positions and sizes cannot be written into the code by any tool. That is why those edits are replaced rather than merged.
+
+Good to know:
+
+- Your draft in the editor is safe. Loading a diagram's code needs a click, and **Save** restores the draft when you finish.
+- Large diagrams that take long to regenerate switch live update off by themselves; **Update diagram** still works.
+- Copies and duplicates of a diagram are each editable on their own: to branch a diagram, duplicate it (⌘D / Ctrl+D) and edit the copy.
+- New diagrams are named from the code: its `title`, else the diagram type (for example "ER diagram"). Renaming the layer in Figma is kept on update.
+- To export SVG, PNG or PDF, select the diagram and use Figma's own Export panel.
+- Turn a diagram into a component with Figma's own shortcut if you want instances: the update keeps the same root layer.
+- Diagrams inserted with v1.1.0 or earlier, and diagrams pasted from the web app, carry no code and cannot be edited this way.
+- Nothing leaves your file: the code is stored as private plugin data, and the plugin still makes no network requests.
+
+How it works, the stored data format and the rules for writing text back into the code: [`docs/source-linked-diagrams.md`](docs/source-linked-diagrams.md).
 
 ---
 

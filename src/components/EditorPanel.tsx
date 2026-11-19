@@ -14,6 +14,8 @@ export interface EditorPanelProps {
   onOpenImport: () => void
   onSelectExample: (code: string) => void
   onOpenAbout?: () => void
+  /** Line under the editor. The Figma plugin says what follows the typing (preview or the diagram in Figma). */
+  hint?: string
 }
 
 export default function EditorPanel({
@@ -26,6 +28,7 @@ export default function EditorPanel({
   onOpenImport,
   onSelectExample,
   onOpenAbout,
+  hint = 'Diagram updates automatically as you type.',
 }: EditorPanelProps) {
   const [examplesOpen, setExamplesOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -143,7 +146,7 @@ export default function EditorPanel({
           <p className="error-text">{error}</p>
         </div>
       ) : (
-        <p className="editor-hint">Diagram updates automatically as you type.</p>
+        <p className="editor-hint">{hint}</p>
       )}
 
       <footer className="editor-footer">

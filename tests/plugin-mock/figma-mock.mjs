@@ -63,8 +63,12 @@ export class MockNode {
   insertChild(i, c) { if (c.parent) c.parent.children.splice(c.parent.children.indexOf(c), 1); this.children.splice(i, 0, c); c.parent = this }
   remove() { if (this.parent) this.parent.children.splice(this.parent.children.indexOf(this), 1); this.parent = null; this.removed = true }
   resize(w, h) { this.width = w; this.height = h }
-  setPluginData(k, v) { (this.pluginData ??= {})[k] = v }
+  // Like Figma, setting '' deletes the entry.
+  setPluginData(k, v) { if (v === '') { if (this.pluginData) delete this.pluginData[k] } else (this.pluginData ??= {})[k] = v }
   getPluginData(k) { return this.pluginData?.[k] ?? '' }
+  getPluginDataKeys() { return Object.keys(this.pluginData ?? {}) }
+  setRelaunchData(d) { this.relaunchData = { ...d } }
+  resizeWithoutConstraints(w, h) { this.width = w; this.height = h }
 }
 
 const SKIP = new Set(['_env', 'parent', 'children', 'id'])
@@ -113,6 +117,10 @@ export async function runPlugin(codePath, svg, buildScene, extraMsg = {}) {
     viewport: { center: { x: 500, y: 400 }, scrollAndZoomIntoView: (n) => log.push(['zoom', n.length]) },
     notify: (...a) => log.push(['notify', a]),
     closePlugin: () => log.push(['close']),
+    // Phase 11 surface: selection events are never fired in this single-message runner (see session.mjs for that).
+    on: () => {},
+    command: '',
+    getNodeByIdAsync: async () => null,
   }
   const ctx = vm.createContext({ figma, __html__: '<html>', atob: globalThis.atob, Buffer })
   vm.runInContext(fs.readFileSync(codePath, 'utf8'), ctx)

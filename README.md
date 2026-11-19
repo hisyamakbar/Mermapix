@@ -4,14 +4,14 @@
 > Paste Mermaid diagrams (ERD-first), DBML, or SQL schemas and get native, editable Figma vector layers with clean Auto Layout — not a flat image.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Figma Plugin: 100% Offline](https://img.shields.io/badge/Figma_Plugin-100%25_Offline-10b981.svg)](plugin/manifest.json)
+[![Figma Community](https://img.shields.io/badge/Figma_Community-Mermapix_plugin-a259ff.svg)](https://www.figma.com/community/plugin/1693698850206280915)
+[![Figma Plugin: 100% Offline](https://img.shields.io/badge/Figma_Plugin-100%25_Offline-10b981.svg)](https://www.figma.com/community/plugin/1693698850206280915)
 [![CI](https://github.com/hisyamakbar/Mermapix/actions/workflows/ci.yml/badge.svg)](https://github.com/hisyamakbar/Mermapix/actions/workflows/ci.yml)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-ec4899.svg)](CONTRIBUTING.md)
 [![Contrast: audited](https://img.shields.io/badge/Contrast-WCAG_AA_audited-cyan.svg)](tests/color-audit.mjs)
 [![Version](https://img.shields.io/badge/version-1.1.0-ec4899.svg)](CHANGELOG.md)
 
-> [!NOTE]
-> **The Figma plugin is in review on Figma Community.** Until it is approved you can already use it: download `mermapix-figma-plugin-v1.1.0.zip` from the [latest release](https://github.com/hisyamakbar/Mermapix/releases/latest) and import it in Figma Desktop (see [Running the Figma Plugin Locally](#-running-the-figma-plugin-locally)). The web app needs no install.
+**Get the Figma plugin:** [Mermapix on Figma Community](https://www.figma.com/community/plugin/1693698850206280915) (Figma Design and FigJam, free, works offline). The web app needs no install.
 
 ---
 
@@ -21,8 +21,12 @@ Most diagram converters export raster PNGs or flattened, non-editable SVGs where
 
 **Mermapix** is designed for software engineers, database architects, and product designers who want diagrams to look like real design system components in Figma. It provides:
 
-1. **Web App (Flagship Zero-Install)**: Open in any browser, write Mermaid code or import SQL/DBML schemas, and copy SVG directly to your clipboard (`Cmd+V` in Figma).
-2. **Figma Companion Plugin**: Run directly inside Figma Design or FigJam. Every Mermaid diagram lands as native Figma structure: shapes become frames with their border merged in, ERD tables and class boxes become **Auto Layout** frames, and every layer gets a meaningful name.
+1. **Web App (Zero-Install)**: Open it in any browser, write Mermaid code or import SQL/DBML schemas, and preview the diagram live in light or dark.
+   - **Open in Figma** opens the [plugin on Figma Community](https://www.figma.com/community/plugin/1693698850206280915) in a new tab; paste your Mermaid code into the plugin and click Insert.
+   - **SVG** and **PNG** download the diagram for use outside Figma.
+2. **Figma Plugin** ([Figma Community](https://www.figma.com/community/plugin/1693698850206280915)): Run it directly inside Figma Design or FigJam. Every Mermaid diagram lands as native Figma structure: shapes become frames with their border merged in, ERD tables and class boxes become **Auto Layout** frames, and every layer gets a meaningful name.
+
+Diagrams go into Figma through the plugin: native frames, Auto Layout ERD tables and named layers, not a flat pasted SVG.
 
 ---
 
@@ -89,17 +93,25 @@ After changing `plugin/src/`, `src/export/`, `src/themes/`, `src/plugin/` or `sr
 
 ---
 
-## 🔌 Running the Figma Plugin Locally
+## 🔌 Install the Figma plugin
 
-The plugin is waiting for Figma Community review. Until it is listed there, run it as a development plugin (it is the same build that was submitted, no build step needed):
-
-1. Download `mermapix-figma-plugin-v1.1.0.zip` from the [latest release](https://github.com/hisyamakbar/Mermapix/releases/latest) and unzip it (or clone this repository and use the `plugin/` folder).
-2. Open **Figma Desktop** (development plugins do not run in the browser).
-3. Open a design file, then **Plugins** > **Development** > **Import plugin from manifest...**.
-4. Select `manifest.json` from the unzipped folder (or `plugin/manifest.json` in the repository).
-5. Run it from **Plugins** > **Development** > **Mermapix**: paste Mermaid code (or pick an example) and click **Insert**.
+1. Open **[Mermapix on Figma Community](https://www.figma.com/community/plugin/1693698850206280915)** and click **Open in...** (Figma Desktop or the browser) or **Save** to add it to your plugins.
+2. In a Figma Design or FigJam file, run it from **Plugins** > **Mermapix**.
+3. Paste Mermaid code (or pick an example) and click **Insert**.
 
 The plugin works fully offline; nothing is sent anywhere. Maintainers: `plugin/PUBLISHING_GUIDE.md` covers the Community publishing steps.
+
+### Run the plugin from source
+
+For contributors, or to try a change before it is published, run the plugin as a development plugin:
+
+1. Clone this repository and run `pnpm build:plugin` (or use the committed bundles as they are).
+2. Open **Figma Desktop** (development plugins do not run in the browser).
+3. Open a design file, then **Plugins** > **Development** > **Import plugin from manifest...**.
+4. Select `plugin/manifest.json`.
+5. Run it from **Plugins** > **Development** > **Mermapix**.
+
+To test a specific release instead, download `mermapix-figma-plugin-<version>.zip` from the [releases page](https://github.com/hisyamakbar/Mermapix/releases), unzip it and import its `manifest.json` the same way.
 
 **Regression pass in real Figma**: import `plugin-dev/manifest.json` (Mermapix Test Runner, developer only) and click **Run all**. It inserts every `tests/figma-fixtures/*.mmd` in light and dark on a new page and stores an audit you can read back with `tests/figma-read-audit.js` (see `tests/README.md`).
 

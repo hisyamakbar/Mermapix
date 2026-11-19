@@ -4,6 +4,16 @@ All notable changes to Mermapix are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+- Web app: the main button is now **Open in Figma**. It opens the Mermapix plugin on Figma Community in a new tab (a plain link: it does not copy the code; paste your Mermaid code into the plugin and click Insert). **Copy to Figma** (SVG via the clipboard) is removed: a pasted SVG has no Auto Layout and is far behind what the plugin builds. SVG and PNG downloads stay. The plugin itself is unchanged.
+- Web app: the onboarding card shown when the editor is empty now reads, in step 3, "Open in Figma: Get the Mermapix plugin, paste your code and click Insert".
+- README, `llms.txt`, `llms-full.txt` and the structured data point to the Figma Community listing; the README has an install section for the published plugin and keeps the development-plugin steps for contributors.
+
+### Fixed
+- The Load Sample ERD Schema button on the empty canvas now loads the sample into the editor.
+
 ## 1.1.0 - 2026-11-06
 
 ### Added

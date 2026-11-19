@@ -2,6 +2,10 @@
 
 A comprehensive, step-by-step guide for publishing the **Mermapix: Mermaid to Editable Figma** plugin to the Figma Community in full compliance with the [Figma Plugin and Widget Review Guidelines](https://help.figma.com/hc/en-us/articles/360039958914-Plugin-and-widget-review-guidelines).
 
+> **Status:** v1.1.0 was approved and published on Figma Community on 2026-11-19: https://www.figma.com/community/plugin/1693698850206280915 (plugin id `1693698850206280915`).
+>
+> **Before the NEXT submission (data storage answer changes).** An upcoming release stores each inserted diagram's Mermaid code (plus theme and diagram type) as private plugin data on the diagram's root node, so a diagram can be edited after it is inserted. That data lives only inside the user's own Figma file (via `setPluginData`), is never sent anywhere, and the plugin stays offline. The answer to **"Does this plugin collect or store user data?"** in section 5 must therefore change from "No" to an accurate description (see the table there), the privacy line in section 6 must be reworded, and the listing description should mention edit-after-insert and what is stored.
+
 ---
 
 ## 1. Plugin Readiness (Pre-Flight Checklist)
@@ -134,7 +138,7 @@ Figma reviewers require answers to safety and compliance questions during submis
 | Reviewer Question | Recommended Response | Context & Rationale |
 | :--- | :--- | :--- |
 | **Does this plugin access external network resources?** | **No** | The plugin configures `"networkAccess": { "allowedDomains": ["none"] }`. All logic and assets are bundled locally into `plugin/ui.html`. |
-| **Does this plugin collect or store user data?** | **No** | Zero telemetry, analytics, or user diagram content is stored or transmitted. |
+| **Does this plugin collect or store user data?** | **v1.1.0 (published): No.** **Next release: Yes, only inside the user's own file.** | v1.1.0: zero telemetry, analytics, or user diagram content is stored or transmitted. Next release: the Mermaid code of each inserted diagram is stored as private plugin data (`setPluginData`) in the user's own Figma file for edit-after-insert; nothing is sent anywhere and the plugin stays offline. Do not answer "No" for the next release. |
 | **Does this plugin use third-party code through `<script src="...">`?** | **No** | All dependencies (Mermaid, React) are bundled statically at compile-time via Vite. |
 | **Does this plugin access Figma document content outside the active selection/page?** | **No** | The plugin only creates nodes on the current active page (`documentAccess: "dynamic-page"`). |
 | **Is the plugin free or paid?** | **Free** | The plugin is completely free and open source. |
@@ -156,7 +160,8 @@ Figma reviewers require answers to safety and compliance questions during submis
 
 5. **Support & Privacy (required on the listing)**:
    - Support contact: GitHub Issues (`https://github.com/hisyamakbar/Mermapix/issues`) or an email address.
-   - Privacy: "Mermapix collects no data. Everything runs locally in Figma; no network requests are made."
+   - Privacy (v1.1.0, published): "Mermapix collects no data. Everything runs locally in Figma; no network requests are made."
+   - Privacy (next release, replaces the line above): say that the Mermaid code of an inserted diagram is stored as private plugin data inside the user's own Figma file so it can be edited later, that Mermapix collects no data and never sends it anywhere, and that no network requests are made.
 
 ---
 
@@ -165,7 +170,8 @@ Figma reviewers require answers to safety and compliance questions during submis
 - Submitting requires the **Figma desktop app** and **two-factor authentication** on the publishing account.
 - While the plugin waits in the review queue it can still be updated from the publish dialog. Re-run `pnpm build:plugin` first so the uploaded `code.js` / `ui.html` are current, and keep the listing text in sync with what the plugin does.
 - Review feedback can be brief and the queue can take days to weeks. Common rejection reasons: crashes or visible developer errors, listing text that does not match behavior, undeclared network access, missing support/privacy information, missing cover/icon.
-- After approval, put the Community URL into the web app's "Copy to Figma" guidance (plan item 8.7).
+- v1.1.0 was approved and published on 2026-11-19 (https://www.figma.com/community/plugin/1693698850206280915). The Community URL is now in the README, `llms.txt` / `llms-full.txt` and the web app's **Open in Figma** button (plan item 8.7, done).
+- Next submission: update the data storage questionnaire answer, the privacy line and the listing text first (see the note at the top of this guide).
 
 ---
 

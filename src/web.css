@@ -1,0 +1,39 @@
+/* Web app only (imported by src/main.tsx after index.css). The Figma plugin UI imports index.css but
+   not this file, so web-only styles here never change the plugin bundle. */
+
+/* "Open in Figma" is an <a> that must look exactly like the red primary button */
+a.export-button {
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a.export-button:visited {
+  color: #ffffff;
+}
+
+/* Web onboarding card (WebEmptyState.tsx, portaled into the canvas). It replaces the shared card, which
+   stays in the DOM because Canvas.tsx renders it, so hide that one. */
+.mpx-canvas > .canvas-empty-state:not(.web-empty-state) {
+  display: none;
+}
+
+.web-empty-state {
+  cursor: default;
+}
+
+.web-empty-state .empty-state-link {
+  color: var(--header-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.web-empty-state .empty-state-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.web-empty-state .empty-state-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}

@@ -25,12 +25,16 @@ This is the canonical project structure. Start with task-relevant files below.
 ```
 Mermapix/
 ├── src/
-│   ├── main.tsx                    # React entrypoint mounting into #root
+│   ├── main.tsx                    # React entrypoint mounting into #root (imports index.css, then web.css)
 │   ├── App.tsx                     # Top-level state coordinator (code, theme, sidebar, modal)
-│   ├── index.css                   # Global CSS, Tailwind v4 imports, design tokens, responsive styles
+│   ├── index.css                   # Global CSS, Tailwind v4 imports, design tokens, responsive styles (shared with the plugin UI)
+│   ├── web.css                     # Web app only styles (Open in Figma link); not in the plugin bundle
+│   ├── links.ts                    # FIGMA_PLUGIN_URL (Figma Community listing)
 │   ├── vite-env.d.ts               # Vite client types (?raw imports)
 │   ├── components/                 # UI components
-│   │   ├── Toolbar.tsx             # Navbar: brand logo, theme toggle, export menu, Copy CTA
+│   │   ├── Toolbar.tsx             # Plugin toolbar (shared component used by src/plugin/AppPlugin.tsx): brand logo, theme toggle, export, primary action
+│   │   ├── WebToolbar.tsx          # Web app toolbar (fork of Toolbar.tsx): theme toggle, SVG/PNG downloads, Open in Figma (red, plain link to the Community plugin in a new tab)
+│   │   ├── FigmaIcon.tsx           # Lucide-style Figma mono-outline icon (lucide ISC); used only to refer to Figma
 │   │   ├── EditorPanel.tsx         # Sidebar editor container with unified mobile/desktop toolbar
 │   │   ├── CodeEditor.tsx          # Code editor with syntax highlighting, line numbers, error alerts
 │   │   ├── Canvas.tsx              # Interactive pan/zoom canvas and floating zoom pill
@@ -126,7 +130,8 @@ Mermapix/
 5. **Static Assets**: All public-facing static assets (logos, favicon, og-image) reside in `public/` and are referenced from `/logo/...` or root. Assets used inside the Figma plugin UI (e.g. the logo icon) must instead be imported with `?inline` from `src/assets/`, because `plugin/ui.html` is a single file and `/logo/...` URLs do not resolve there.
 6. **One Phase Per Session**: Work on one phase at a time per session and update the checklist in `plans/mermapix-plan.md`.
 7. **Offline, no network**: the plugin declares `networkAccess: none` and the listing promises 100% offline. Never add a remote font, script, stylesheet or fetch. Fonts are self-hosted woff2 in `src/assets/fonts/` (inlined into the plugin UI by `assetsInlineLimit`); `scripts/build-plugin.mjs` also strips any remote CSS `@import` from the plugin build.
-8. **Generated bundles are committed**: `plugin/code.js`, `plugin/ui.html`, `plugin-dev/code.js`, `plugin-dev/ui.html`. After changing `plugin/src/`, `src/export/`, `src/themes/`, `src/plugin/`, `src/index.css` or a fixture, run `pnpm build:plugin` and `pnpm build:test-runner` and commit the outputs, or Figma keeps running the old code.
+8. **Web-only changes stay out of the plugin bundle**: the plugin UI imports shared components (`Toolbar`, `Canvas`, `CanvasEmptyState`, `EditorPanel`, `AboutModal`, ...) and `src/index.css`. A change meant only for the web app goes into web-only files (`WebToolbar.tsx`, `web.css`, `App.tsx`), so `pnpm build:plugin` stays byte-identical and the published plugin is not affected until the next plugin release.
+9. **Generated bundles are committed**: `plugin/code.js`, `plugin/ui.html`, `plugin-dev/code.js`, `plugin-dev/ui.html`. After changing `plugin/src/`, `src/export/`, `src/themes/`, `src/plugin/`, `src/index.css` or a fixture, run `pnpm build:plugin` and `pnpm build:test-runner` and commit the outputs, or Figma keeps running the old code.
 
 ## Dependencies
 

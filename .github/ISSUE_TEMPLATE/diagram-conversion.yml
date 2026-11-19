@@ -21,7 +21,6 @@ body:
       label: How did you insert it?
       options:
         - Figma plugin (Insert)
-        - Web app, Copy to Figma (paste)
         - Web app, SVG / PNG download
     validations:
       required: true

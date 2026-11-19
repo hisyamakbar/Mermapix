@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import mermaid from 'mermaid'
 import { PanelLeft, Code2, Network, Sparkles, ChevronDown, Wand2, FolderInput } from 'lucide-react'
 import { DEFAULT_EXAMPLE, EXAMPLES } from './examples/index.ts'
 import { initMermaid } from './themes/presets.ts'
-import { exportSvg, copyToFigma, exportPng } from './export/svg.ts'
+import { exportSvg, exportPng } from './export/svg.ts'
 import { useCanvasZoom } from './hooks/useCanvasZoom.ts'
 import { sanitizeMermaidCode } from './utils/sanitize.ts'
-import Toolbar from './components/Toolbar.tsx'
+import { FIGMA_PLUGIN_URL } from './links.ts'
+import WebToolbar from './components/WebToolbar.tsx'
 import EditorPanel from './components/EditorPanel.tsx'
 import Canvas from './components/Canvas.tsx'
+import WebEmptyState from './components/WebEmptyState.tsx'
 import ImportModal from './components/ImportModal.tsx'
 import AboutModal from './components/AboutModal.tsx'
 import type { Theme } from './types/index.ts'
@@ -36,7 +39,6 @@ export default function App() {
   })
   const [error, setError] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [copied, setCopied] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [theme, setTheme] = useState<Theme>(() => {
@@ -104,6 +106,14 @@ export default function App() {
     handlePointerUp,
   } = useCanvasZoom(svg)
 
+  // The web onboarding card is portaled into the canvas section, outside Canvas's React tree, so the pan
+  // handlers (setPointerCapture) cannot swallow clicks on its buttons. See WebEmptyState.tsx.
+  const [canvasEl, setCanvasEl] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setCanvasEl(canvasRef.current)
+  }, [canvasRef])
+  const showEmptyState = !svg && !code.trim()
+
   // Live render: validate then render Mermaid whenever code or theme changes
   useEffect(() => {
     let active = true
@@ -152,14 +162,6 @@ export default function App() {
     }
   }, [theme])
 
-  const handleCopyToFigma = async () => {
-    const success = await copyToFigma(diagramRef.current)
-    if (success) {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
-    }
-  }
-
   const handleExportSvg = () => {
     exportSvg(diagramRef.current)
   }
@@ -193,14 +195,13 @@ export default function App() {
 
   return (
     <main className="mpx-app" data-theme={theme} data-sidebar={sidebarOpen ? 'open' : 'closed'}>
-      <Toolbar
+      <WebToolbar
         theme={theme}
         onToggleTheme={() => setTheme((val) => (val === 'light' ? 'dark' : 'light'))}
         hasSvg={Boolean(svg)}
-        copied={copied}
-        onCopyToFigma={handleCopyToFigma}
         onExportSvg={handleExportSvg}
         onExportPng={handleExportPng}
+        openInFigmaUrl={FIGMA_PLUGIN_URL}
       />
 
       <div className="mpx-body">
@@ -347,6 +348,9 @@ export default function App() {
           onPointerUp={handlePointerUp}
           onLoadSample={() => setCode(DEFAULT_DIAGRAM)}
         />
+        {showEmptyState &&
+          canvasEl &&
+          createPortal(<WebEmptyState onLoadSample={() => setCode(DEFAULT_DIAGRAM)} />, canvasEl)}
       </div>
 
       <ImportModal

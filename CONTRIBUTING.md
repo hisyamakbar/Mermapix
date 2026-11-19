@@ -6,7 +6,7 @@ By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Ways to help
 
-- **Report a diagram that does not convert cleanly.** This is the most valuable contribution. Use the [Diagram conversion issue](https://github.com/hisyamakbar/Mermapix/issues/new?template=diagram-conversion.yml) template and include the Mermaid code, the theme (light / dark), where you inserted it (web "Copy to Figma" or the Figma plugin) and a screenshot of the Figma result next to the preview.
+- **Report a diagram that does not convert cleanly.** This is the most valuable contribution. Use the [Diagram conversion issue](https://github.com/hisyamakbar/Mermapix/issues/new?template=diagram-conversion.yml) template and include the Mermaid code, the theme (light / dark), where you inserted it (the Figma plugin, or a web SVG/PNG download) and a screenshot of the Figma result next to the preview.
 - **Report a bug** in the web app or the plugin UI with the [Bug report](https://github.com/hisyamakbar/Mermapix/issues/new?template=bug_report.yml) template.
 - **Suggest a feature** with the [Feature request](https://github.com/hisyamakbar/Mermapix/issues/new?template=feature_request.yml) template.
 - **Send a pull request**: fixes for a reported case, a new converter for a diagram type, docs.
@@ -29,7 +29,7 @@ To try the Figma plugin: `pnpm build:plugin`, then in **Figma Desktop** go to Pl
 
 Read [`AGENTS.md`](AGENTS.md) for the full architecture. The short version:
 
-1. **Web app** (`src/`): Mermaid renders the diagram, then `buildExportSvg` (`src/export/svg.ts`) writes every computed style onto the SVG and rebuilds each label as absolutely positioned `<tspan>`s so Figma imports editable text. The SVG goes to the clipboard or a download.
+1. **Web app** (`src/`): Mermaid renders the diagram, then `buildExportSvg` (`src/export/svg.ts`) writes every computed style onto the SVG and rebuilds each label as absolutely positioned `<tspan>`s so Figma imports editable text. The SVG goes to a download, or to the Figma plugin (step 2).
 2. **Figma plugin** (`plugin/src/`, bundled to `plugin/code.js`): the plugin UI (`src/plugin/`) sends that same SVG to the sandbox, which runs `prepareSvgForFigma` → `figma.createNodeFromSvg` → `optimizeDiagramNodes`. One step per diagram type (`DIAGRAM_STEPS` in `optimize.ts`: ERD, flowchart, sequence, class, state, treemap, railroad, edge labels, then a generic fallback) turns the imported vectors into frames, Auto Layout and named layers.
 
 ## Rules that keep the output correct

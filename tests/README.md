@@ -89,9 +89,9 @@ node tests/export-svg.mjs --out tests/baseline
 
 Perform this verification after modifying themes, the SVG export pipeline, or the Auto Layout plugin engine:
 
-1. Open the Mermapix web app or companion plugin.
+1. Open the Mermapix companion plugin in Figma.
 2. Load an ERD fixture or example into the editor.
-3. Click **Copy to Figma** (Web) or **Insert to Canvas** (Plugin).
+3. Click **Insert to Canvas**.
 4. In Figma, verify:
    - [ ] Resulting nodes are native **editable layers**, not flattened raster images.
    - [ ] ERD tables are structured into vertical **Auto Layout frames** (Plugin) with clean padding.

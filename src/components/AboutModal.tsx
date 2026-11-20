@@ -255,7 +255,8 @@ export default function AboutModal({ isOpen, onClose, showPluginLink = false }: 
 
           <p style={{ margin: 0, fontSize: '11px', lineHeight: 1.5, color: 'var(--muted)' }}>
             <strong>Privacy:</strong> Mermapix collects no data. Your diagrams are rendered and
-            converted locally; no network requests are made.
+            converted locally; no network requests are made. The plugin saves an inserted
+            diagram&apos;s code inside your own Figma file so you can edit it later.
           </p>
         </div>
 

@@ -38,7 +38,7 @@ body:
     id: version
     attributes:
       label: Mermapix version
-      description: Shown in the About dialog (e.g. v1.1.0).
+      description: Shown in the About dialog (e.g. v1.2.0).
   - type: textarea
     id: extra
     attributes:

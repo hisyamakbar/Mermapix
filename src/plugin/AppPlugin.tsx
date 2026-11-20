@@ -22,7 +22,7 @@ import Canvas from '../components/Canvas.tsx'
 import ImportModal from '../components/ImportModal.tsx'
 import AboutModal from '../components/AboutModal.tsx'
 import SourceLinkStrip, { type FollowUp, type StripState } from './SourceLinkStrip.tsx'
-import { applyTextChanges } from './sourcePatch.ts'
+import { applyCanvasEdits } from './sourcePatch.ts'
 import { diagramName } from './diagramName.ts'
 import { describeConfirm, isNothingLeft, pendingEdits, remainingChanges, settleHandled, type ApplyOutcome } from './changeSummary.ts'
 import {
@@ -96,6 +96,12 @@ interface EditSession {
    * update is due when the editor differs from it (see liveSync.ts, wantsLiveUpdate).
    */
   base: Snapshot
+  /**
+   * The code the diagram on the canvas stands for: `synced.code` plus the canvas text edits written into
+   * the code. The canvas report (ERD row numbers, ...) is relative to it. It differs from the editor's
+   * code while the editor is ahead (typed, live update not sent yet or off); see applyCanvasEdits.
+   */
+  canvasCode: string
   /** Live update paused: an update would replace changes made in Figma, so only the user may send it. */
   hold: boolean
   /** Slow live updates in a row; `slowMs` is the last slow duration (for the note). */
@@ -111,6 +117,7 @@ interface ApplyUndo {
   handled: TextChange[]
   ignored: TextChange[]
   base: Snapshot
+  canvasCode: string
   applied: TextChange[]
 }
 
@@ -486,6 +493,7 @@ export default function AppPlugin() {
       start: source,
       synced: source,
       base: source,
+      canvasCode: source.code,
       hold: false,
       slowStreak: 0,
     })
@@ -589,6 +597,7 @@ export default function AppPlugin() {
                 ignored: [],
                 synced: snap,
                 base: snap,
+                canvasCode: snap.code,
                 hold: false,
                 slowStreak,
                 slowMs: isSlowStreak(slowStreak) ? ms : cur.slowMs,
@@ -719,7 +728,15 @@ export default function AppPlugin() {
     setConfirming(null)
     clearDone()
     setEdit((cur) =>
-      cur && { ...cur, error: undefined, result: null, undo: null, handled: [], ignored: reportedTexts },
+      cur && {
+        ...cur,
+        error: undefined,
+        result: null,
+        undo: null,
+        handled: [],
+        ignored: reportedTexts,
+        canvasCode: cur.synced.code,
+      },
     )
     want.current = { force: false, quiet: false }
     if (!sameSnapshot({ code, theme }, edit.start)) {
@@ -745,7 +762,9 @@ export default function AppPlugin() {
   // trigger a live update (that would replace the text layer the person in Figma is typing in).
   useEffect(() => {
     if (!edit || !latest.current.edit || pending.length === 0) return
-    const patched = applyTextChanges(code, pending.map((p) => p.patch))
+    // Resolved against what the canvas shows; carried into the editor only where the editor agrees on the
+    // place (it may be ahead of the diagram), otherwise listed as "Could not match".
+    const patched = applyCanvasEdits(edit.canvasCode, code, pending.map((p) => p.patch))
     const unresolved = new Set(patched.unresolved)
     const placed = pending.filter((p) => !unresolved.has(p.patch))
     const failed = pending.filter((p) => unresolved.has(p.patch))
@@ -763,12 +782,20 @@ export default function AppPlugin() {
         ...cur,
         result: total > 0 ? { total, unresolved: patched.unresolved } : cur.result,
         undo: changed
-          ? { code: before, handled: cur.handled, ignored: cur.ignored, base: cur.base, applied: placed.map((p) => p.layer) }
+          ? {
+              code: before,
+              handled: cur.handled,
+              ignored: cur.ignored,
+              base: cur.base,
+              canvasCode: cur.canvasCode,
+              applied: placed.map((p) => p.layer),
+            }
           : cur.undo,
         handled: settleHandled(cur.handled, placed.map((p) => p.layer)),
         // Listed once as "Could not match"; not tried again on every later change of the canvas.
         ignored: [...cur.ignored, ...failed.map((p) => p.layer)],
         base: changed && inSync ? { ...cur.base, code: patched.source } : cur.base,
+        canvasCode: placed.length > 0 ? patched.reference : cur.canvasCode,
       }
     })
     // Runs when the report brings something new; `code` and `edit` are read as they are at that moment.
@@ -788,6 +815,7 @@ export default function AppPlugin() {
         handled: u.handled,
         ignored: [...u.ignored, ...u.applied],
         base: u.base,
+        canvasCode: u.canvasCode,
         undo: null,
         result: null,
       },

@@ -184,6 +184,10 @@ The sandbox always compares the canvas with what was generated, and stamps are n
 | An applied edit typed back to the generated text on the canvas | The reverse edit. Not offered when layers were deleted: a deleted layer and a reverted one look the same in the report. |
 | Two layers with the same generated text and context | Never restated: the patcher reports them as unresolved instead of guessing which one changed. |
 
+### The editor ahead of the diagram
+
+Canvas positions (the row of an ERD attribute, ...) describe the code the diagram shows, which is not the editor's code while the user has typed and the live update has not regenerated the diagram yet (or Live is off). The session therefore keeps `canvasCode` (the generated code plus the applied canvas edits) and the UI calls `applyCanvasEdits(canvasCode, editorCode, changes)`. It resolves each change in `canvasCode` and carries it into the editor only when the place is certain: an `erd-attr` edit needs its row line and its table header line unchanged in the editor, with the row still inside that table (lines are matched by what the editor shares with `canvasCode` at the top and at the bottom; a line next to an identical one is ambiguous); every other kind must resolve in the editor to exactly the same edit on the same unchanged lines. Everything else is unresolved and listed as "Could not match". When the editor equals `canvasCode` this is plain `applyTextChanges`.
+
 Edits that could not be placed, and edits taken back with **Undo**, go on an ignore list and are not tried again until that layer changes once more. They still count when an update asks before replacing edits made in Figma.
 
 ## Live link while the plugin is open

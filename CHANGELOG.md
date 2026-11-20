@@ -4,7 +4,7 @@ All notable changes to Mermapix are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 1.2.0 - 2026-11-20
 
 ### Added
 - **The plugin theme follows Figma.** The theme follows Figma's light or dark theme each time the plugin opens and when Figma's theme changes (not while a diagram is being edited); the Light/Dark toggle still switches it for the session.
@@ -31,6 +31,7 @@ All notable changes to Mermapix are documented here. The format follows
 - Plugin: the **Live** switch reads "Live on", "Live off" or "Live paused"; its dot is green when on, hollow when off and amber when paused or slow.
 
 ### Fixed
+- **Canvas text edits never land on the wrong ERD row while the editor is ahead (plugin).** When you had typed in the editor and the diagram was not regenerated yet (or Live was off), a text edit made on the canvas was placed by row number in the changed code, so it could land on another row. It is now placed where the diagram's own code has it and carried over only when that line, and the table it belongs to, is unchanged in the editor; otherwise it is listed as "Could not match".
 - Plugin: on Windows the plugin window showed a page scrollbar; scrolling it moved the whole app away and left an empty window.
 - The Load Sample ERD Schema button on the empty canvas (web and plugin) now loads the sample into the editor; it did nothing because the canvas's pan handler captured the pointer and swallowed the click. Presses on buttons, links and inputs inside the canvas no longer start a pan.
 - Plugin: code typed just before finishing edit mode was dropped when **Live** was off, while an update was in flight, or before the preview had rendered: the editor went back to the draft and the diagram was not updated. **Save** now updates the diagram first.

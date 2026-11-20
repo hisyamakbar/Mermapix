@@ -139,7 +139,7 @@ When an AI assistant or prompt engineer produces Mermaid diagrams for ingestion 
 ## 5. Privacy, Security, & Deployment Architecture
 
 - **100% Client-Side**: All parsing, rendering, and SVG sanitization happen in the user's browser or Figma plugin sandbox.
-- **Zero Data Collection**: Mermapix does not store schemas, diagram code, or user identifiers.
+- **Zero Data Collection**: Mermapix collects no data and has no server, analytics or user identifiers. The only thing it keeps is the Mermaid code of a diagram the plugin inserted, saved as private plugin data inside the user's own Figma file so the diagram can be edited later; it never leaves the file.
 - **Cloudflare Hosting**: Static single-page app served from the Vite build, with immutable asset caching and security headers (`public/_headers`).
 
 ---

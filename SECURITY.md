@@ -1,6 +1,6 @@
 # Security Policy
 
-Mermapix runs entirely locally: the web app renders diagrams in your browser and the Figma plugin declares `networkAccess: none`. It collects no data and makes no network requests.
+Mermapix runs entirely locally: the web app renders diagrams in your browser and the Figma plugin declares `networkAccess: none`. It collects no data and makes no network requests. The plugin saves an inserted diagram's Mermaid code as private plugin data inside your own Figma file (for editing it later); that data never leaves the file.
 
 ## Supported versions
 

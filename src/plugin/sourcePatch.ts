@@ -713,30 +713,184 @@ function patchOne(source: string, change: TextChange): string | null {
   return patchGeneric(source, change, kind)
 }
 
+type Outcome = 'applied' | 'unresolved' | 'dropped'
+
 /**
- * Write text edits made in Figma back into Mermaid source, one after another on the evolving source.
- * Entity renames are applied after every other change (those refer to the old title), results keep
- * the input order.
+ * The shared loop: one change after another on the evolving source(s). Entity renames are applied after
+ * every other change (those refer to the old title); results keep the input order.
  */
-export function applyTextChanges(source: string, changes: TextChange[]): PatchResult {
-  const outcome: Array<'applied' | 'unresolved' | 'dropped'> = changes.map(() => 'unresolved')
+function runChanges(changes: TextChange[], step: (change: TextChange) => boolean): Outcome[] {
+  const outcome: Outcome[] = changes.map(() => 'unresolved')
   const order = changes
     .map((_, i) => i)
     .sort((a, b) => Number(changes[a].context?.kind === 'erd-entity') - Number(changes[b].context?.kind === 'erd-entity') || a - b)
-  let current = source
   for (const i of order) {
     const change = changes[i]
     if (norm(change.from) === norm(change.to)) {
       outcome[i] = 'dropped'
       continue
     }
-    const next = patchOne(current, change)
-    if (next === null) continue
-    current = next
-    outcome[i] = 'applied'
+    if (step(change)) outcome[i] = 'applied'
   }
+  return outcome
+}
+
+/**
+ * Write text edits made in Figma back into Mermaid source, one after another on the evolving source.
+ * Entity renames are applied after every other change (those refer to the old title), results keep
+ * the input order.
+ */
+export function applyTextChanges(source: string, changes: TextChange[]): PatchResult {
+  let current = source
+  const outcome = runChanges(changes, (change) => {
+    const next = patchOne(current, change)
+    if (next === null) return false
+    current = next
+    return true
+  })
   return {
     source: current,
+    applied: changes.filter((_, i) => outcome[i] === 'applied'),
+    unresolved: changes.filter((_, i) => outcome[i] === 'unresolved'),
+  }
+}
+
+// ---------------------------------------------------------------- editor ahead of the diagram
+
+export interface CanvasPatchResult extends PatchResult {
+  /** `reference` with the applied changes written into it: what the canvas shows, as code. */
+  reference: string
+}
+
+/**
+ * Where line `i` of `from` sits in `to`, by the lines both share at the top and at the bottom. Null when
+ * the line is inside the part that differs, or when the top-first and the bottom-first reading disagree
+ * (a line inserted next to an identical one: either place could be meant).
+ */
+function lineMapper(from: string[], to: string[]): (i: number) => number | null {
+  const limit = Math.min(from.length, to.length)
+  const prefix = (max: number) => {
+    let n = 0
+    while (n < max && from[n] === to[n]) n++
+    return n
+  }
+  const suffix = (max: number) => {
+    let n = 0
+    while (n < max && from[from.length - 1 - n] === to[to.length - 1 - n]) n++
+    return n
+  }
+  const shift = to.length - from.length
+  const topFirst = prefix(limit)
+  const bottomOfTop = suffix(limit - topFirst)
+  const bottomFirst = suffix(limit)
+  const topOfBottom = prefix(limit - bottomFirst)
+  const at = (i: number, top: number, bottom: number) =>
+    i < top ? i : i >= from.length - bottom ? i + shift : null
+  return (i) => {
+    const a = at(i, topFirst, bottomOfTop)
+    const b = at(i, topOfBottom, bottomFirst)
+    return a !== null && a === b ? a : null
+  }
+}
+
+/** Offset of the start of every line of `text` (split on `\n`). */
+function lineStarts(lines: string[]): number[] {
+  const out: number[] = []
+  let at = 0
+  for (const l of lines) {
+    out.push(at)
+    at += l.length + 1
+  }
+  return out
+}
+
+/** Index of the line that holds `offset`. */
+function lineOf(starts: number[], offset: number): number {
+  let n = 0
+  while (n + 1 < starts.length && starts[n + 1] <= offset) n++
+  return n
+}
+
+/**
+ * An edited ERD attribute row, carried from the reference to the editor: the row and the header of its
+ * table must both be unchanged lines in the editor, and the row must still sit in that table. The new
+ * editor code, or null.
+ */
+function carryErRow(
+  ref: string,
+  cur: string,
+  refLines: string[],
+  curLines: string[],
+  map: (i: number) => number | null,
+  edited: number[],
+  newRefLines: string[],
+): string | null {
+  if (edited.length !== 1 || detectKind(cur) !== 'er') return null
+  const i = edited[0]
+  const j = map(i)
+  if (j === null) return null
+  const refStarts = lineStarts(refLines)
+  const curStarts = lineStarts(curLines)
+  const refBlock = parseEr(maskComments(ref)).blocks.find((b) => b.rows.some((r) => r.start === refStarts[i]))
+  const curBlock = parseEr(maskComments(cur)).blocks.find((b) => b.rows.some((r) => r.start === curStarts[j]))
+  if (!refBlock || !curBlock) return null
+  const header = map(lineOf(refStarts, refBlock.id.start))
+  if (header === null || lineOf(curStarts, curBlock.id.start) !== header) return null
+  const out = [...curLines]
+  out[j] = newRefLines[i]
+  return out.join('\n')
+}
+
+/**
+ * `applyTextChanges` for an editor that may be ahead of the diagram (Phase 13.11). The canvas report
+ * (row numbers of an ERD table, ...) describes the code the diagram shows, `reference`. When the editor
+ * holds other code, a change is applied only if its place is the same in both: it is resolved in the
+ * reference and in the editor, and the editor's result must be exactly the reference's edit carried to
+ * the same, unchanged line(s) of the editor. Anything else is unresolved, never placed by guesswork.
+ */
+export function applyCanvasEdits(reference: string, editor: string, changes: TextChange[]): CanvasPatchResult {
+  if (reference === editor) {
+    const r = applyTextChanges(editor, changes)
+    return { ...r, reference: r.source }
+  }
+  let ref = reference
+  let cur = editor
+  const outcome = runChanges(changes, (change) => {
+    const nextRef = patchOne(ref, change)
+    if (nextRef === null) return false
+    const refLines = ref.split('\n')
+    const newRefLines = nextRef.split('\n')
+    if (refLines.length !== newRefLines.length) return false
+    const curLines = cur.split('\n')
+    const map = lineMapper(refLines, curLines)
+    const edited: number[] = []
+    for (let i = 0; i < refLines.length; i++) if (refLines[i] !== newRefLines[i]) edited.push(i)
+    let nextCur: string | null
+    if (change.context?.kind === 'erd-attr') {
+      // One row: carried to the same row of the editor, wherever rows were added or removed above it.
+      nextCur = carryErRow(ref, cur, refLines, curLines, map, edited, newRefLines)
+    } else {
+      // Anything that can touch several places (a rename, a label found by its text): the editor must
+      // resolve it by itself to exactly the reference's edit on the same unchanged lines.
+      nextCur = patchOne(cur, change)
+      if (nextCur !== null) {
+        const expected = [...curLines]
+        for (const i of edited) {
+          const j = map(i)
+          if (j === null) return false
+          expected[j] = newRefLines[i]
+        }
+        if (expected.join('\n') !== nextCur) return false
+      }
+    }
+    if (nextCur === null) return false
+    ref = nextRef
+    cur = nextCur
+    return true
+  })
+  return {
+    source: cur,
+    reference: ref,
     applied: changes.filter((_, i) => outcome[i] === 'applied'),
     unresolved: changes.filter((_, i) => outcome[i] === 'unresolved'),
   }

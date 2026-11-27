@@ -42,4 +42,7 @@ skills-lock.json
 plans/
 scratch/
 
+# Intro video project (maintainer-local: reference videos, renders)
+video/
+
 

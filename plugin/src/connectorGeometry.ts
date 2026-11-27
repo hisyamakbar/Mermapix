@@ -43,8 +43,11 @@ export function smallestContainer<T extends Rect>(item: Rect, candidates: T[], t
 const EDGE_NAME_RE = /(?:^|-)L_(.+)_(\d+)$/
 /** classDiagram relations: `<svgId>-id_<from>_<to>_<n>` (ERD `id_entity-…` edges are not matched). */
 const CLASS_EDGE_NAME_RE = /(?:^|-)id_(.+)_(\d+)$/
-/** stateDiagram transitions (`edge<n>`) and note/class-note connectors carry no ids at all. */
-const ANON_EDGE_NAME_RE = /(?:^|-)(?:edge|edgeNote)\d+$|----note-\d+(?:-.*)?$/
+/**
+ * stateDiagram transitions (`edge<n>`) and note/class-note connectors carry no ids at all; neither do the
+ * use case relations (`usecase-<svgId>-edge-<n>`, notes `usecase-<svgId>-note-<n>-edge`, Mermaid 12.3.0).
+ */
+const ANON_EDGE_NAME_RE = /(?:^|-)(?:edge|edgeNote)\d+$|----note-\d+(?:-.*)?$|^usecase-.+-(?:edge-\d+|note-\d+-edge)$/
 
 /** Mermaid edge layer names look like `<svgId>-L_<from>_<to>_<n>`. Returns `<from>_<to>` or null. */
 export function edgeBodyFromName(name: string | null | undefined): string | null {
@@ -186,8 +189,13 @@ export interface EdgeGeom {
   pts: Pt[]
 }
 
-/** Largest distance (px) from a label center to its own edge line. Mermaid centers a label on the unsmoothed edge points, the drawn curve cuts corners (14px seen on a TD diagram). */
-export const LABEL_MAX_DISTANCE = 32
+/**
+ * Largest distance (px) from a label center to its own edge line. Mermaid centers a label on the unsmoothed
+ * edge points, the drawn curve cuts corners (14px seen on a TD diagram with 11.16.1; 33px on a class diagram
+ * with 12.3.0, where the label of `Duck --> Pond : lives in` sits off the curve). A label that is far from
+ * every line, or about equally far from two, is still left unassigned by LABEL_MIN_MARGIN.
+ */
+export const LABEL_MAX_DISTANCE = 48
 /** The nearest edge must beat the runner-up by at least this much to count as unambiguous. */
 export const LABEL_MIN_MARGIN = 12
 

@@ -18,6 +18,8 @@ tests/
     erd-basic.mmd
     flowchart-basic.mmd
     sequence-basic.mmd
+  figma-fixtures/  # One or more diagrams per Mermaid type (export, viewBox, colour audit, Test Runner)
+  official-samples/ # Mermaid's own sample diagrams (@mermaid-js/examples), see its README
   baseline/        # Verified baseline SVG exports and structural summaries (*.summary.json)
   output/          # Latest generated export artifacts (git-ignored)
   unit/            # Node native test runner suite (converters, sanitizers)
@@ -40,9 +42,11 @@ pnpm test:export
 
 ### Figma plugin tests (mock Figma)
 `unit/plugin-*.test.mjs` run the real built `plugin/code.js` (run `pnpm build:plugin` first) against real Mermaid payload SVGs through a mock Figma sandbox (`plugin-mock/`: `svg-import.mjs` imitates `figma.createNodeFromSvg`, `figma-mock.mjs` the plugin API, `layout-sim.mjs` a minimal Auto Layout simulation, `survey-metrics.mjs` layer metrics).
-- Payload SVGs: `fixtures/plugin/*.svg` (dark, `-light` for light theme); `fixtures/plugin/survey/*.svg.gz` are the gzipped payloads of the remaining Mermaid types (Phase 8.5 survey). Sources: `figma-fixtures/*.mmd`.
+- Payload SVGs: `fixtures/plugin/*.svg` (dark, `-light` for light theme); `fixtures/plugin/survey/*.svg.gz` are the gzipped payloads of the remaining Mermaid types (Phase 8.5 survey) and of the Phase 14 types (`usecase`, `usecase-variants`, `usecase-extras`, `agentflow`, `agentflow-extras`). Sources: `figma-fixtures/*.mmd`. All of them are **Mermaid 12.3.0** exports taken through the real **SVG** button of the current tree (theme CSS and the 12.x layout pins included); the earlier 11.16.1 payloads are gone. `usecase*` / `agentflow*` have dedicated converters (`plugin-usecase.test.mjs`, `plugin-agentflow.test.mjs`) and are listed as dedicated in `plugin-generic.test.mjs`, which proves the generic fallback stays away from them.
 - `MERMAPIX_CODE=<path> pnpm test:unit` runs the plugin tests against another bundle (e.g. the previous `code.js`) to prove a new test fails before the fix. The mock importer reproduces real Figma's inline `<clipPath>` behavior (a visible shape, not a mask).
-- Regenerate a payload: load the `.mmd` in the web app, pick the theme and use the **SVG** export button (what the plugin UI posts).
+- Regenerate the payloads: with the dev server running, `node tests/export-fixtures.mjs --out <dir>` writes `<fixture>-<theme>.svg` for every fixture; copy each to its payload name (dark = no suffix, `-light` for light, survey payloads gzipped with `gzip -9`; mapping: the `NN-case-*` / `N-ex-*` names above, `NN-survey-<type>` to `survey/<type>`, `43-usecase-checkout` to `survey/usecase`, `44-usecase-variants` to `survey/usecase-variants`, `45-agentflow-support` to `survey/agentflow`, `46-usecase-extras`, `47-agentflow-extras` likewise). Mermaid's hand-drawn paths (rough.js) draw their control points at random, so a re-export of an unchanged diagram differs in path data (never in bounds, ids or text): compare layer trees, not bytes. Then `pnpm build:plugin && pnpm test:unit`. A single payload by hand: load the `.mmd` in the web app, pick the theme and use the **SVG** export button (what the plugin UI posts).
+- `fixtures/plugin/raw-erd-not-inlined.svg` is derived, not exported: it is `baseline/erd-basic.svg` with its four `<g class="inlined-marker ...">` groups removed again (`svg.replace(/<g class="inlined-marker[^>]*>[\s\S]*?<\/g>/g, '')`), i.e. an export from before marker inlining. Refresh it whenever `baseline/erd-basic.svg` is refreshed (`node tests/export-svg.mjs --out tests/baseline`).
+- Use case and agentflow suites share `plugin-mock/diagram-asserts.mjs` (zero-drop texts, no generic names, every painted vector keeps its bounds, fallback tag absent). The 12.3.0 official samples `usecase__0..2` and `agentflow__0` (`official-samples/`) convert with the same rules; they are not payload fixtures, check them by hand after changing `usecase.ts` / `agentflow.ts` (`export-fixtures.mjs --fixtures` on a folder holding them, then the mock tree).
 
 ### Source-linked diagrams (edit after insert)
 How the feature works: [`docs/source-linked-diagrams.md`](../docs/source-linked-diagrams.md). Four suites cover it, none needs Figma:
@@ -64,7 +68,15 @@ How the feature works: [`docs/source-linked-diagrams.md`](../docs/source-linked-
 ### Export fixtures, viewBox check and colour audit (Phase 10.1)
 - `node tests/export-fixtures.mjs --out <dir> [--shots <dir>] [--only 37,40] [--themes dark]` exports every `figma-fixtures/*.mmd` in both themes through the real **SVG** button and checks that the exported content (client rects of all painted shapes and texts, mapped into SVG user space) lies inside the exported viewBox (1px tolerance; layers wholly outside the box, such as gantt's today marker, are Mermaid clipping them on purpose). Writes `<name>-<theme>.svg`, `viewbox-check.txt` and optionally a PNG per export; exit code 1 on any overflow or leftover `<foreignObject>`. These files are what `fixtures/plugin/*` hold: regenerate a payload by copying the matching `<name>-<theme>.svg` (dark = no suffix, `-light` for light; survey payloads are gzipped).
 - `node tests/color-audit.mjs` (`pnpm test:colors`) also audits `<foreignObject>` HTML labels (`h` column) and the `<text>` of the exported SVG (`x` column, mounted 1:1 on the diagram background).
+- `--fixtures <dir>` exports another folder of `.mmd` files with the same checks (default `tests/figma-fixtures`). Mermaid's own samples: `node tests/export-fixtures.mjs --fixtures tests/official-samples --out <dir>` (82 files, about 6 minutes for both themes). A sample that does not render is listed as `ERROR no svg rendered: <the editor's message>`.
 - `unit/export-viewbox.test.mjs` (padding rule), `unit/plugin-safety-net.test.mjs` (the plugin's root frame never crops its content) and `unit/plugin-eventmodeling.test.mjs`.
+
+### Diagram type coverage (Phase 14)
+Mermaid adds diagram types between releases and the docs list some that Mermapix cannot render, so the suite checks the types themselves, not only the fixtures we remembered to write.
+- `unit/diagram-coverage.test.mjs` (in `pnpm test:unit`, no browser) asks the installed Mermaid which diagram ids it registers (`mermaid.initialize` then `getRegisteredDiagramsMetadata()`, which works in Node) and requires each one to be supported, refused on purpose or internal. Supported: listed in `DIAGRAM_KEYWORDS` (`src/utils/diagramSupport.ts`) and covered by a fixture in `figma-fixtures/` or `official-samples/` that Mermaid's `detectType` assigns to it. Refused: an entry in `UNSUPPORTED_DIAGRAMS` (same file) with the reason and the message the editor shows. Internal (`error`, `---`, `info`): `INTERNAL_IDS` in the test.
+- After a Mermaid upgrade that adds a type the test fails with the new id and the three ways out (convert it with a fixture, refuse it with a message, or mark it internal). It also fails when a listed keyword is no longer detected as its type, when a refused type starts to render, or when a type disappears.
+- `unit/diagram-support.test.mjs`: the editor message for code that cannot render (`explainRenderError`): a refused type names itself and the alternative, a misspelled first word is never called unsupported and gets a "Did you mean" suggestion, any other error passes through.
+- Refresh Mermaid's samples: [`official-samples/README.md`](official-samples/README.md).
 
 ### Developer test runner (real Figma, one click)
 `plugin-dev/` is a separate, developer-only Figma plugin (**Mermapix Test Runner (dev)**, id `mermapix-test-runner-dev`). It is not published and not part of the production plugin. Its generated `plugin-dev/code.js` + `plugin-dev/ui.html` are committed, like `plugin/`, so you can import it without building.
@@ -116,6 +128,25 @@ Perform this verification after modifying themes, the SVG export pipeline, or th
    - [ ] Text is properly vertically and horizontally centered inside entity cells.
    - [ ] Line arrows, relationship paths, and cardinality notations render crisply.
    - [ ] ERD types, keys (PK, FK, UK), and column notes are preserved.
+
+### Use case and agentflow diagrams (Mermaid 12.3.0, Phase 14.3 / 14.4)
+
+Insert `figma-fixtures/43-usecase-checkout.mmd`, `44-usecase-variants.mmd`, `46-usecase-extras.mmd`, `45-agentflow-support.mmd`, `47-agentflow-extras.mmd` with the production plugin (dark and light) and compare each with the preview.
+
+Use case
+- [ ] Each actor is ONE frame `Actor: <name>` (select it in the Layers panel and drag it: figure and name move together). The figure looks like the preview (plain, hollow, awesome, business slash, icon placeholder).
+- [ ] Each use case is a frame `Use Case: <label>`: the ellipse is a vector inside it (a frame cannot be elliptical), stroke and fill like the preview, the label is editable text centred on the ellipse (double-click edits it without ungrouping). The rect form `Name[Label]` is an Auto Layout frame with square corners and the paint on the frame itself.
+- [ ] Check the ellipse stroke (2px, centre aligned) is not clipped at the wrapper frame's edge and that the label stays centred after editing it to something longer.
+- [ ] System boundary `System Boundary: <title>` and package `Package: <title>` (Tab + Body frames): border, title and tab look like the preview; the use cases are children of the boundary (drag the boundary: they follow); actors outside it stay outside.
+- [ ] Notes `Note: <text>`; the dotted note connector reaches the note and its actor.
+- [ ] Layers panel: one `Connectors` group on top with `Edge: A → B` per relation; the arrowhead, circle or hollow generalization arrow (`Inheritance Arrow`) and the «include» / «extend» label are inside their edge group; arrowheads touch the ellipse border like in the preview (no gap, no overlap).
+- [ ] Edit a use case label, an actor name and a boundary title on the canvas with the plugin open in edit mode: the code follows (`Browse("...")`, `actor Customer("...")`, `systemBoundary shop["..."]`).
+
+Agentflow
+- [ ] Nodes are frames named by kind (`Task:`, `Tool:`, `Input:`, `Decision:`, `Action:`, `Refdoc:`) with the shape (parallelogram, double-bar rectangle, diamond, hexagon, lined document) as one vector, border and fill like the preview; tasks are rounded Auto Layout frames. The lined document no longer has a second, stacked outline vector.
+- [ ] Flow containers are `Flow: <title>` frames (stroke only, rounded corners), nested like the source, with their nodes as children.
+- [ ] Edges: `Edge: A → B` groups in `Connectors`; the line layer is named `Sequence`, `Reference` (dotted, no arrow, suffix `(reference)`) or `Failure` (cross marker, suffix `(failure)`); the `yes` / `no` labels travel with their edge.
+- [ ] Edit a node label and a flow title on the canvas in edit mode: the code follows (`classify["..."]@{ shape: task }`, `flow triage["..."]`).
 
 ### Source-linked diagrams (edit after insert)
 

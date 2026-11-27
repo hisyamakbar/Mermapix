@@ -181,6 +181,12 @@ export function deriveTextContexts(root: any): Map<any, TextContext> {
       } else if (nodeId === '' && clusterId !== '' && clusterId.indexOf('#') < 0) {
         const texts = directTexts(n)
         if (texts.length === 1) out.set(texts[0], { kind: 'cluster', id: clusterId })
+        // A use case `package` boundary (usecase.ts) keeps its title in a child `Tab` frame.
+        if (kind === 'Package') {
+          const tab = liveChildren(n).find((c) => c.type === 'FRAME' && c.name === 'Tab')
+          const tabTexts = tab ? directTexts(tab) : []
+          if (tabTexts.length === 1) out.set(tabTexts[0], { kind: 'cluster', id: clusterId })
+        }
       }
     }
     for (const c of liveChildren(n)) visit(c)

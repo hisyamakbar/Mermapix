@@ -157,8 +157,22 @@ export const THEME_PRESETS: Record<Theme, Record<string, string | boolean | Reco
       labelColor: '#09090b',
       lineColor: '#71717a',
       iconColor: '#52525b',
-      descriptionColor: '#15803d',
+      // 4.0:1 (#15803d) on the tinted `:::highlight` row, 5.7:1 now
+      descriptionColor: '#166534',
     },
+    // Gantt: Mermaid derives the active-task fill from primaryColor (white on white, border
+    // #f8fafc: the bar vanished) and draws a critical task in pure red. Same hues as the
+    // categorical palette (cScale0 / cScalePeer0) and as the dark theme's red.
+    activeTaskBkgColor: '#dbeafe',
+    activeTaskBorderColor: '#2b6eda',
+    critBkgColor: '#fecaca',
+    critBorderColor: '#dc2626',
+    gridColor: '#d4d4d8',
+    // Agentflow flow containers (new in Mermaid 12): default secondaryBorderColor is near-white
+    flowContainerStroke: '#a1a1aa',
+    // Use case: actors are drawn only as a line figure, so they need the 3:1 a line needs
+    // (the shared nodeBorder #e4e4e7 is a card outline, 1.3:1)
+    usecaseActorBorder: '#71717a',
   },
   dark: {
     darkMode: true,
@@ -344,6 +358,19 @@ export const THEME_PRESETS: Record<Theme, Record<string, string | boolean | Reco
     doneTaskBorderColor: '#64748b',
     critBkgColor: '#b91c1c',
     critBorderColor: '#f87171',
+    // Radar graticule defaults to #DEDEDE at 30%: a heavy grey polygon behind the curves
+    radar: {
+      graticuleColor: '#475569',
+      graticuleOpacity: '0.25',
+    },
+    // Gantt: excluded days (`excludes weekends`) default to #eeeeee, the alternate section band
+    // to white at 20% opacity and the grid to lightgrey: light grey blocks and lines on the
+    // midnight background (the weekend bands hid the grid until they were darkened)
+    gridColor: '#334155',
+    excludeBkgColor: '#131b2e',
+    altSectionBkgColor: '#334155',
+    // Agentflow flow containers (new in Mermaid 12): default secondaryBorderColor is near-invisible
+    flowContainerStroke: '#64748b',
   },
 }
 
@@ -385,6 +412,39 @@ export const RAILROAD_PRESETS: Record<Theme, Record<string, string>> = {
   },
 }
 
+// Mermaid 12 changed these defaults; the values below are the 11.x ones.
+const DAGRE = { layout: 'dagre' }
+const LEGACY_NODE_SIZING = { wrappingWidth: 200, minNodeWidth: 0 }
+
+// Rules for what Mermaid 12 leaves unthemed when labels are SVG text (`htmlLabels: false`).
+// `themeCSS` is scoped to each diagram and appended to Mermaid's own stylesheet.
+function themeCss(theme: Theme): string {
+  const { noteTextColor, flowContainerStroke, gridColor } = THEME_PRESETS[theme]
+  return `
+    /* Use case: the ellipse, rectangle and business shapes put the label's left edge at the
+       node centre (only HTML labels are centred by labelHelper), so it overflowed the
+       shape. The actor label is positioned explicitly and must not be centred twice. */
+    .usecase-element .label text { text-anchor: middle; }
+    /* Mermaid hides some rectangles with opacity 0 (use case actor hit areas, the box behind a
+       class diagram lollipop interface) but leaves their inherited fill and stroke on them.
+       The SVG export rewrites every opacity 0 to 1, which painted them as solid boxes (black in
+       the light theme, white in the dark one, behind the actor's figure and label). Without
+       any paint they stay invisible even then. */
+    rect[opacity="0"], rect[style^="opacity:0;"], rect[style*=" opacity:0;"], rect[style*=";opacity:0;"], rect[style="opacity:0"] { fill: none !important; stroke: none !important; }
+    /* Use case notes: Mermaid sets the note text colour on .nodeLabel only, which SVG
+       labels do not have, so the text inherited the note's own fill (invisible). */
+    .usecase-note text, .usecase-note tspan { fill: ${noteTextColor}; }
+    /* Agentflow: in the classic look Mermaid's own \`.flow-cluster rect\` rule paints the flow
+       container with clusterBorder (near-invisible, shared with flowchart subgraphs) and wins
+       over the flowContainerStroke theme variable, which only reaches the SVG attribute. */
+    .flow-cluster rect { stroke: ${flowContainerStroke}; }
+    /* Gantt: the d3 axis draws its tick lines with stroke="currentColor" (a presentation
+       attribute, so Mermaid's \`.grid .tick { stroke }\` rule on the parent never reaches them).
+       The app's text colour leaked in: near-white grid lines, invisible on the light theme. */
+    .grid .tick line { stroke: ${gridColor}; }
+  `
+}
+
 export function initMermaid(theme: Theme = 'dark') {
   mermaid.initialize({
     startOnLoad: false,
@@ -392,23 +452,45 @@ export function initMermaid(theme: Theme = 'dark') {
     // Must be set at the top level (not only under `flowchart`) or Mermaid still
     // renders node labels as HTML inside <foreignObject>, which Figma cannot import.
     htmlLabels: false,
+    // Mermaid 12 defaults flowchart, class, ER, state, sequence, requirement, use case,
+    // venn, swimlane and agentflow to the `neo` look (different geometry and edge
+    // routing). The plugin's converters and the themes are built on the classic look.
+    look: 'classic',
+    themeCSS: themeCss(theme),
     themeVariables: {
       ...THEME_PRESETS[theme],
       fontFamily: 'Inter, system-ui, sans-serif',
       fontSize: '13px',
     },
     railroad: RAILROAD_PRESETS[theme],
+    // The 12.3.0 build lays out with ELK by default (orthogonal edges, other node
+    // positions). Dagre keeps the layout users and the plugin converters know. It is
+    // set per diagram type, not globally: a global `layout` would also replace the
+    // layouts mindmap and swimlane choose for themselves.
     flowchart: {
       htmlLabels: false,
       curve: 'basis',
       padding: 20,
+      ...LEGACY_NODE_SIZING,
+      ...DAGRE,
     },
+    state: { ...LEGACY_NODE_SIZING, ...DAGRE },
+    class: DAGRE,
+    er: DAGRE,
+    requirement: DAGRE,
     // Gantt sizes itself to its container's width at render time, so the same code
     // came out 500px wide in the plugin window (labels pushed outside the bars, axis
     // dates crowded) and 1600px on a wide screen. A fixed width makes web and plugin
     // output identical and gives bars room for their labels.
     gantt: {
       useWidth: 1200,
+    },
+    // Radar sizes its viewBox from width + margins (50px each side by default) and lets the
+    // axis labels overflow it, so a label longer than ~8 characters ("Documentation",
+    // "Dev Experience") ended outside the viewBox and the export cut it off.
+    radar: {
+      marginLeft: 100,
+      marginRight: 100,
     },
   })
 }

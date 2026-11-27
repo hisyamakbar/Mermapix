@@ -1316,7 +1316,7 @@
 		if (Math.abs(len - ideal) > Math.max(2.5, ideal * .03)) return null;
 		return bestR;
 	}
-	var near$1 = (a, b, tol) => Math.abs(a - b) <= tol;
+	var near$2 = (a, b, tol) => Math.abs(a - b) <= tol;
 	/** Corner points of a polyline-only path (M/L/H/V/Z), consecutive duplicates and closing point removed. */
 	function polygonVertices(cmds) {
 		const polys = [];
@@ -1331,7 +1331,7 @@
 				polys.push(cur);
 			}
 			const last = cur[cur.length - 1];
-			if (!last || !near$1(last.x, nx, .01) || !near$1(last.y, ny, .01)) cur.push({
+			if (!last || !near$2(last.x, nx, .01) || !near$2(last.y, ny, .01)) cur.push({
 				x: nx,
 				y: ny
 			});
@@ -1345,7 +1345,7 @@
 		for (const poly of polys) if (poly.length > 1) {
 			const a = poly[0];
 			const b = poly[poly.length - 1];
-			if (near$1(a.x, b.x, .01) && near$1(a.y, b.y, .01)) poly.pop();
+			if (near$2(a.x, b.x, .01) && near$2(a.y, b.y, .01)) poly.pop();
 		}
 		return polys;
 	}
@@ -1355,7 +1355,7 @@
 		const open = pts.slice();
 		const first = open[0];
 		const last = open[open.length - 1];
-		if (near$1(first.x, last.x, .01) && near$1(first.y, last.y, .01)) open.pop();
+		if (near$2(first.x, last.x, .01) && near$2(first.y, last.y, .01)) open.pop();
 		let far = 0;
 		let best = -1;
 		open.forEach((p, i) => {
@@ -1413,7 +1413,7 @@
 				x: 0,
 				y: h
 			}
-		].every((c) => poly.some((p) => near$1(p.x, c.x, tol) && near$1(p.y, c.y, tol)));
+		].every((c) => poly.some((p) => near$2(p.x, c.x, tol) && near$2(p.y, c.y, tol)));
 	}
 	function classifyPolygon(poly, w, h) {
 		const tol = Math.max(1, Math.min(w, h) * .02);
@@ -1436,15 +1436,15 @@
 					x: 0,
 					y: h / 2
 				}
-			].every((m) => poly.some((p) => near$1(p.x, m.x, tol) && near$1(p.y, m.y, tol)))) return "Diamond";
+			].every((m) => poly.some((p) => near$2(p.x, m.x, tol) && near$2(p.y, m.y, tol)))) return "Diamond";
 			if ([...new Set(poly.map((p) => Math.round(p.y / tol)))].length === 2) {
-				const top = poly.filter((p) => near$1(p.y, 0, tol)).map((p) => p.x).sort((a, b) => a - b);
-				const bottom = poly.filter((p) => near$1(p.y, h, tol)).map((p) => p.x).sort((a, b) => a - b);
+				const top = poly.filter((p) => near$2(p.y, 0, tol)).map((p) => p.x).sort((a, b) => a - b);
+				const bottom = poly.filter((p) => near$2(p.y, h, tol)).map((p) => p.x).sort((a, b) => a - b);
 				if (top.length === 2 && bottom.length === 2) {
 					const topW = top[1] - top[0];
 					const botW = bottom[1] - bottom[0];
-					if (near$1(topW, botW, tol) && !near$1(top[0], bottom[0], tol)) return "Parallelogram";
-					if (!near$1(topW, botW, tol)) return "Trapezoid";
+					if (near$2(topW, botW, tol) && !near$2(top[0], bottom[0], tol)) return "Parallelogram";
+					if (!near$2(topW, botW, tol)) return "Trapezoid";
 				}
 			}
 			return "Polygon";
@@ -1477,7 +1477,7 @@
 					cornerRadius: 0
 				};
 				if (r >= rMax - .6) return {
-					kind: near$1(width, height, .6) ? "Circle" : "Stadium",
+					kind: near$2(width, height, .6) ? "Circle" : "Stadium",
 					rectLike: true,
 					cornerRadius: rMax
 				};
@@ -1494,7 +1494,7 @@
 				const poly = polys[0];
 				const axisAligned = poly.every((p, i) => {
 					const q = poly[(i + 1) % poly.length];
-					return near$1(p.x, q.x, .01) || near$1(p.y, q.y, .01);
+					return near$2(p.x, q.x, .01) || near$2(p.y, q.y, .01);
 				});
 				if (poly.length === 4 && isBoundsCorners(poly, width, height)) return {
 					kind: "Rectangle",
@@ -1508,7 +1508,7 @@
 		}
 		if (flat.lineCount === 0 && flat.subpaths.length === 1) {
 			const outline = flat.subpaths[0];
-			if (isEllipseOutline(outline, width, height)) return complex(near$1(width, height, .6) ? "Circle" : "Ellipse");
+			if (isEllipseOutline(outline, width, height)) return complex(near$2(width, height, .6) ? "Circle" : "Ellipse");
 			const poly = simplifyClosed(outline, Math.max(1.5, Math.min(width, height) * .04));
 			return complex(poly.length <= 8 ? classifyPolygon(poly, width, height) : "Shape");
 		}
@@ -1517,13 +1517,13 @@
 			const prev = cmds[i - 1];
 			if (!prev || prev.p.length < 2) return false;
 			const px = prev.p[prev.p.length - 2];
-			return near$1(c.p[0], px, .5);
+			return near$2(c.p[0], px, .5);
 		});
 		if (flat.lineCount > 0 && verticalOnly) return complex("Cylinder");
 		return complex("Shape");
 	}
 	function sameBounds(a, b, tol = .5) {
-		return near$1(a.x, b.x, tol) && near$1(a.y, b.y, tol) && near$1(a.width, b.width, tol) && near$1(a.height, b.height, tol);
+		return near$2(a.x, b.x, tol) && near$2(a.y, b.y, tol) && near$2(a.width, b.width, tol) && near$2(a.height, b.height, tol);
 	}
 	/** Groups items with identical bounds (stacked fill/outline duplicates), preserving z-order. */
 	function groupStackedBounds(items, tol = .5) {
@@ -1598,7 +1598,7 @@
 	}
 	//#endregion
 	//#region plugin/src/shapes.ts
-	var isLive$8 = (n) => Boolean(n) && !n.removed;
+	var isLive$10 = (n) => Boolean(n) && !n.removed;
 	var hasFill = (v) => Array.isArray(v.fills) && v.fills.length > 0 && v.fills[0].visible !== false && v.fills[0].opacity !== 0;
 	var hasStroke = (v) => Array.isArray(v.strokes) && v.strokes.length > 0 && v.strokes[0].visible !== false && v.strokes[0].opacity !== 0 && Number(v.strokeWeight) > 0;
 	/** Origin of the coordinate space children of `parent` live in (GROUPs are transparent). */
@@ -1637,9 +1637,9 @@
 			others: []
 		};
 		const visit = (n) => {
-			if (!isLive$8(n) || !("children" in n)) return;
+			if (!isLive$10(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$8(c)) continue;
+				if (!isLive$10(c)) continue;
 				if (c.type === "VECTOR") out.vectors.push(c);
 				else if (c.type === "TEXT") {
 					if ((c.characters || "").trim().length > 0) out.texts.push(c);
@@ -1797,7 +1797,7 @@
 		frame.fills = fillSrc ? cloneAll(fillSrc.fills) : [];
 		if (strokeSrc) applyStroke(frame, strokeSrc, merge.dash);
 		frame.cornerRadius = cls.cornerRadius;
-		for (const v of vectors) if (isLive$8(v)) try {
+		for (const v of vectors) if (isLive$10(v)) try {
 			v.remove();
 		} catch (_unused10) {}
 		tag(frame, "mermapix:kind", cls.kind);
@@ -1808,7 +1808,7 @@
 	* Returns null (group untouched) when it has no vector, or contains unknown node types.
 	*/
 	function convertShapeGroup(group, opts = {}) {
-		if (!isLive$8(group) || !group.parent || !("children" in group)) return null;
+		if (!isLive$10(group) || !group.parent || !("children" in group)) return null;
 		const parts = collectParts(group);
 		if (parts.vectors.length === 0 || parts.others.length > 0) return null;
 		const visuals = groupStackedBounds(parts.vectors).map((vs) => ({
@@ -1923,7 +1923,7 @@
 			t.y = ry;
 			textWidth = Math.max(textWidth, t.width);
 		}
-		for (const v of parts.vectors) if (isLive$8(v) && v.parent !== frame) try {
+		for (const v of parts.vectors) if (isLive$10(v) && v.parent !== frame) try {
 			v.remove();
 		} catch (_unused14) {}
 		try {
@@ -2004,8 +2004,11 @@
 	var EDGE_NAME_RE = /(?:^|-)L_(.+)_(\d+)$/;
 	/** classDiagram relations: `<svgId>-id_<from>_<to>_<n>` (ERD `id_entity-…` edges are not matched). */
 	var CLASS_EDGE_NAME_RE = /(?:^|-)id_(.+)_(\d+)$/;
-	/** stateDiagram transitions (`edge<n>`) and note/class-note connectors carry no ids at all. */
-	var ANON_EDGE_NAME_RE = /(?:^|-)(?:edge|edgeNote)\d+$|----note-\d+(?:-.*)?$/;
+	/**
+	* stateDiagram transitions (`edge<n>`) and note/class-note connectors carry no ids at all; neither do the
+	* use case relations (`usecase-<svgId>-edge-<n>`, notes `usecase-<svgId>-note-<n>-edge`, Mermaid 12.3.0).
+	*/
+	var ANON_EDGE_NAME_RE = /(?:^|-)(?:edge|edgeNote)\d+$|----note-\d+(?:-.*)?$|^usecase-.+-(?:edge-\d+|note-\d+-edge)$/;
 	/** Mermaid edge layer names look like `<svgId>-L_<from>_<to>_<n>`. Returns `<from>_<to>` or null. */
 	function edgeBodyFromName(name) {
 		if (!name || typeof name !== "string") return null;
@@ -2141,7 +2144,7 @@
 					best = i;
 				} else if (d < second) second = d;
 			});
-			if (best < 0 || bestD > 32) return -1;
+			if (best < 0 || bestD > 48) return -1;
 			if (second - bestD < 12) return -1;
 			return best;
 		});
@@ -2151,7 +2154,7 @@
 	var CLUSTER_ID_KEY = "mermapix:cluster";
 	var CLUSTER_LABEL_KEY = "mermapix:label";
 	var NODE_ID_KEY = "mermapix:node";
-	var isLive$7 = (n) => Boolean(n) && !n.removed;
+	var isLive$9 = (n) => Boolean(n) && !n.removed;
 	var readData$2 = (n, key) => {
 		try {
 			return typeof n.getPluginData === "function" ? n.getPluginData(key) || "" : "";
@@ -2175,9 +2178,9 @@
 	function findClusterGroups(root) {
 		const out = [];
 		const visit = (n) => {
-			if (!isLive$7(n) || !("children" in n)) return;
+			if (!isLive$9(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$7(c) || c.type !== "GROUP") continue;
+				if (!isLive$9(c) || c.type !== "GROUP") continue;
 				const id = clusterIdFromName(c.name);
 				if (id !== null) {
 					const parts = collectParts(c);
@@ -2259,9 +2262,9 @@
 	function collectItems(root) {
 		const items = [];
 		const visit = (n) => {
-			if (!isLive$7(n) || !("children" in n)) return;
+			if (!isLive$9(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$7(c)) continue;
+				if (!isLive$9(c)) continue;
 				if (isClusterFrame(c) || isNodeFrame(c)) items.push({
 					node: c,
 					rect: absRect(c),
@@ -2322,7 +2325,7 @@
 	}
 	//#endregion
 	//#region plugin/src/connectors.ts
-	var isLive$6 = (n) => Boolean(n) && !n.removed;
+	var isLive$8 = (n) => Boolean(n) && !n.removed;
 	var readData$1 = (n, key) => {
 		try {
 			return typeof n.getPluginData === "function" ? n.getPluginData(key) || "" : "";
@@ -2335,11 +2338,11 @@
 	function collectEdges(root) {
 		const edges = [];
 		const visit = (n) => {
-			if (!isLive$6(n) || !("children" in n)) return;
+			if (!isLive$8(n) || !("children" in n)) return;
 			const kids = [...n.children];
 			for (let i = 0; i < kids.length; i++) {
 				const c = kids[i];
-				if (!isLive$6(c)) continue;
+				if (!isLive$8(c)) continue;
 				if (c.type === "VECTOR") {
 					var _edgeBodyFromName;
 					const body = (_edgeBodyFromName = edgeBodyFromName(c.name)) !== null && _edgeBodyFromName !== void 0 ? _edgeBodyFromName : isAnonymousEdgeName(c.name) ? "" : null;
@@ -2347,7 +2350,7 @@
 					const markers = [];
 					for (let j = i + 1; j < kids.length; j++) {
 						const m = kids[j];
-						if (isLive$6(m) && m.type === "GROUP" && String(m.name || "").includes("inlined-marker")) markers.push(m);
+						if (isLive$8(m) && m.type === "GROUP" && String(m.name || "").includes("inlined-marker")) markers.push(m);
 						else break;
 					}
 					const a = absRect(c);
@@ -2371,9 +2374,9 @@
 		const labels = /* @__PURE__ */ new Map();
 		const targets = [];
 		const visit = (n) => {
-			if (!isLive$6(n) || !("children" in n)) return;
+			if (!isLive$8(n) || !("children" in n)) return;
 			for (const c of n.children) {
-				if (!isLive$6(c)) continue;
+				if (!isLive$8(c)) continue;
 				if (isNodeFrame(c)) {
 					const id = readData$1(c, NODE_ID_KEY);
 					const label = readData$1(c, CLUSTER_LABEL_KEY);
@@ -2402,9 +2405,9 @@
 	function collectEdgeLabelFrames(root) {
 		const out = [];
 		const visit = (n) => {
-			if (!isLive$6(n) || !("children" in n)) return;
+			if (!isLive$8(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$6(c)) continue;
+				if (!isLive$8(c)) continue;
 				if (isEdgeLabelFrame(c)) out.push(c);
 				else if (c.type === "GROUP" && !String(c.name || "").includes("inlined-marker")) visit(c);
 			}
@@ -2417,9 +2420,9 @@
 		const clusters = [];
 		const nodes = [];
 		const visit = (n) => {
-			if (!isLive$6(n) || !("children" in n)) return;
+			if (!isLive$8(n) || !("children" in n)) return;
 			for (const c of [...n.children]) {
-				if (!isLive$6(c)) continue;
+				if (!isLive$8(c)) continue;
 				if (isClusterFrame(c)) clusters.push(c);
 				else if (isNodeFrame(c)) nodes.push(c);
 				else if (c.type === "GROUP") visit(c);
@@ -2432,7 +2435,7 @@
 		};
 	}
 	function makeGroup$1(members, parent, name) {
-		const live = members.filter(isLive$6);
+		const live = members.filter(isLive$8);
 		if (live.length === 0) return null;
 		try {
 			const g = figma.group(live, parent);
@@ -2446,14 +2449,14 @@
 	* Arranges the flowchart root: top-level subgraph frames, loose node frames, then `Connectors`.
 	* Everything keeps its absolute position (members are only reparented / grouped).
 	*/
-	function arrangeFlowchart(root) {
+	function arrangeFlowchart(root, options = {}) {
 		const result = {
 			edges: 0,
 			grouped: 0,
 			labelsInEdges: 0,
 			labelsLoose: 0
 		};
-		if (!isLive$6(root) || root.type !== "FRAME") return result;
+		if (!isLive$8(root) || root.type !== "FRAME") return result;
 		const { labels: labelMap, targets } = collectLabels(root);
 		const edges = collectEdges(root);
 		const labelFrames = collectEdgeLabelFrames(root);
@@ -2487,9 +2490,10 @@
 		edges.forEach((e, i) => {
 			const ends = e.body ? resolveEdgeEndpoints(e.body, known) : resolveEdgeEndpointsByGeometry(e.pts, targets);
 			const label = (id) => labelMap.get(id) || id;
-			const name = ends ? edgeDisplayName(label(ends.from), label(ends.to)) : `Edge: ${e.body || "Connector"}`;
+			const style = options.classifyEdge ? options.classifyEdge(e.vector, e.markers) : null;
+			const name = (ends ? edgeDisplayName(label(ends.from), label(ends.to)) : `Edge: ${e.body || "Connector"}`) + (style && style.suffix || "");
 			try {
-				e.vector.name = "Line";
+				e.vector.name = style && style.line || "Line";
 			} catch (_unused3) {}
 			const members = [
 				e.vector,
@@ -2507,6 +2511,410 @@
 		for (const lf of loose) if (lf.parent !== root) moveKeepingAbs(lf, root, absRect(lf));
 		const connectors = makeGroup$1([...edgeGroups, ...loose], root, "Connectors");
 		if (connectors) root.appendChild(connectors);
+		return result;
+	}
+	//#endregion
+	//#region plugin/src/agentflowGeometry.ts
+	var NODE_RE$1 = /-agentflow-(.+)-(\d+)$/;
+	/** Mermaid id of an agentflow node group (`mermaid-svg-0-agentflow-classify-2` -> `classify`), else null. */
+	function agentflowNodeId(name) {
+		if (!name || typeof name !== "string" || name.includes("inlined-marker")) return null;
+		const m = NODE_RE$1.exec(name);
+		return m ? m[1] : null;
+	}
+	/**
+	* Agentflow node kind from the classified shape. `stackedPair` = the node drew its outline twice (fill path +
+	* hand-drawn outline path with identical bounds): only the lined document does that, and its polygon is not a
+	* known shape. Anything else (a canonical shape name used directly: `shape: cyl`, `shape: rect`) gets no kind
+	* and keeps its geometric name.
+	*/
+	function agentflowKind(kind, stackedPair) {
+		switch (kind) {
+			case "Rounded Rectangle": return "Task";
+			case "Subroutine": return "Tool";
+			case "Parallelogram": return "Input";
+			case "Diamond": return "Decision";
+			case "Hexagon": return "Action";
+			case "Polygon":
+			case "Shape": return stackedPair ? "Refdoc" : null;
+			default: return null;
+		}
+	}
+	var MARKER_NAME_RE = /^inlined-marker-\d+-([a-z-]+)-(?:start|end)$/;
+	/** Marker kind encoded in a raw marker layer name (`inlined-marker-3-cross-end` -> `cross`), else ''. */
+	function markerKindOfLayer(name) {
+		const m = MARKER_NAME_RE.exec(String(name || "").trim().toLowerCase());
+		return m ? m[1] : "";
+	}
+	/**
+	* Edge semantics of an agentflow connector (docs: sequence `-->`, reference `-.-`, failure `--x`) from its marker
+	* kinds and dash. Null when the combination is none of the three, so the edge keeps the default naming.
+	*/
+	function agentflowEdgeStyle(markerKinds, dashed) {
+		if (markerKinds.includes("cross")) return {
+			line: "Failure",
+			suffix: " (failure)"
+		};
+		if (markerKinds.includes("arrowhead")) return { line: "Sequence" };
+		if (markerKinds.length === 0 && dashed) return {
+			line: "Reference",
+			suffix: " (reference)"
+		};
+		return null;
+	}
+	//#endregion
+	//#region plugin/src/agentflow.ts
+	var isLive$7 = (n) => Boolean(n) && !n.removed;
+	var ROLE_KEY$1 = "mermapix:role";
+	/** Converts the nodes and flow containers of an agentflow payload. Returns what it found (0 / 0 = not agentflow). */
+	function convertAgentflow(root) {
+		const groups = [];
+		const find = (n) => {
+			if (!isLive$7(n) || !("children" in n)) return;
+			for (const c of [...n.children]) {
+				if (!isLive$7(c) || c.type !== "GROUP") continue;
+				const id = agentflowNodeId(c.name);
+				if (id !== null) groups.push({
+					group: c,
+					id
+				});
+				else find(c);
+			}
+		};
+		find(root);
+		let nodes = 0;
+		for (const { group, id } of groups) {
+			const stackedPair = groupStackedBounds(collectParts(group).vectors).some((s) => s.length === 2 && !classifyShape(pathDataOf(s[0]), s[0].width, s[0].height).rectLike);
+			const res = convertShapeGroup(group, { nodeId: id });
+			if (!res) continue;
+			const kind = agentflowKind(res.kind, stackedPair);
+			const label = res.label || id;
+			res.frame.name = `${kind || res.kind}: ${label}`;
+			tag(res.frame, CLUSTER_LABEL_KEY, label);
+			tag(res.frame, ROLE_KEY$1, (kind || res.kind).toLowerCase());
+			nodes++;
+		}
+		if (nodes === 0) return {
+			nodes: 0,
+			flows: 0
+		};
+		const flows = convertClusters(root, {
+			prefix: "Flow",
+			kind: "Flow"
+		});
+		for (const f of flows) tag(f.frame, ROLE_KEY$1, "flow");
+		nestIntoClusters(root);
+		return {
+			nodes,
+			flows: flows.length
+		};
+	}
+	//#endregion
+	//#region plugin/src/usecaseGeometry.ts
+	var NODE_RE = /-usecase-(.+)$/;
+	/** Mermaid id of a use case node / actor / note / boundary group (`mermaid-svg-0-usecase-Customer` -> `Customer`), else null. */
+	function usecaseNodeId(name) {
+		if (!name || typeof name !== "string" || name.includes("inlined-marker")) return null;
+		const m = NODE_RE.exec(name);
+		return m ? m[1] : null;
+	}
+	/** `note-0`, `note-1`: the ids Mermaid gives `note for X "..."` boxes. */
+	var isUsecaseNoteId = (id) => /^note-\d+$/.test(id);
+	var near$1 = (a, b, tol) => Math.abs(a - b) <= tol;
+	/** True when a label is centred in a box (use case labels are; a boundary title sits on its top edge). */
+	function isCentredIn(text, box) {
+		const dx = text.x + text.width / 2 - (box.x + box.width / 2);
+		const dy = text.y + text.height / 2 - (box.y + box.height / 2);
+		return Math.abs(dx) <= Math.max(3, box.width * .1) && Math.abs(dy) <= Math.max(2.5, box.height * .1);
+	}
+	var containsCentre = (box, t) => {
+		const cx = t.x + t.width / 2;
+		const cy = t.y + t.height / 2;
+		return cx >= box.x - 1 && cx <= box.x + box.width + 1 && cy >= box.y - 1 && cy <= box.y + box.height + 1;
+	};
+	var insideRect = (outer, inner, tol) => inner.x >= outer.x - tol && inner.y >= outer.y - tol && inner.x + inner.width <= outer.x + outer.width + tol && inner.y + inner.height <= outer.y + outer.height + tol;
+	var union = (rs) => {
+		const x0 = Math.min(...rs.map((r) => r.x));
+		const y0 = Math.min(...rs.map((r) => r.y));
+		return {
+			x: x0,
+			y: y0,
+			width: Math.max(...rs.map((r) => r.x + r.width)) - x0,
+			height: Math.max(...rs.map((r) => r.y + r.height)) - y0
+		};
+	};
+	/**
+	* What a node group is, from its parts only (null = not understood, the generic fallback handles it):
+	*  - actor    : an unpainted hit-area vector (when the importer keeps it) or a label outside every painted
+	*               shape, plus at least one painted figure vector
+	*  - note     : id `note-<n>` and nothing unpainted
+	*  - package  : two painted rects, the smaller a tab on the top edge of the bigger one (title in the tab)
+	*  - boundary : one painted rect whose title is not centred in it
+	*  - usecase  : one painted shape (ellipse or rect) with its label centred in it
+	*/
+	function classifyUsecaseGroup(input) {
+		const { id, vectors, texts } = input;
+		if (texts.length === 0 || vectors.length === 0) return null;
+		const unpainted = vectors.filter((v) => !v.painted);
+		const painted = vectors.filter((v) => v.painted);
+		const outside = texts.some((t) => !painted.some((v) => containsCentre(v.rect, t)));
+		if (unpainted.length > 0 || outside && painted.length > 0) return painted.length > 0 ? "actor" : null;
+		if (isUsecaseNoteId(id)) return painted.length >= 1 ? "note" : null;
+		if (painted.length === 0) return null;
+		const area = (v) => v.rect.width * v.rect.height;
+		const byArea = painted.slice().sort((a, b) => area(b) - area(a));
+		const v = byArea[0];
+		const rest = byArea.slice(1);
+		if (rest.length === 1 && v.rectLike && rest[0].rectLike) {
+			const tab = rest[0].rect;
+			const body = v.rect;
+			if (near$1(tab.y + tab.height, body.y, 1.5) && tab.x >= body.x - 1.5 && tab.x + tab.width <= body.x + body.width + 1.5) return "package";
+		}
+		if (!rest.every((r) => insideRect(v.rect, r.rect, 2))) return null;
+		const centred = isCentredIn(union(texts), v.rect);
+		if (v.ellipse) return centred ? "usecase" : null;
+		if (!v.rectLike) return null;
+		return centred ? "usecase" : rest.length === 0 ? "boundary" : null;
+	}
+	/**
+	* Which texts of an actor are its name: those outside every figure vector (an unregistered icon draws a `?` inside the
+	* figure). All of them when none qualifies.
+	*/
+	function actorNameTexts(figures, texts) {
+		const out = texts.map((_, i) => i).filter((i) => !figures.some((f) => containsCentre(f, texts[i])));
+		return out.length > 0 ? out : texts.map((_, i) => i);
+	}
+	/**
+	* Layer names of an actor's figure vectors (same order as `rects`). One path is the `Figure` (a business slash or an
+	* icon beside it is a `Detail`); a hollow / awesome actor draws a `Head` above a `Body`.
+	*/
+	function actorPartNames(rects) {
+		if (rects.length <= 1) return rects.map(() => "Figure");
+		const top = Math.min(...rects.map((r) => r.y));
+		const bottom = Math.max(...rects.map((r) => r.y + r.height));
+		const area = (r) => r.width * r.height;
+		const main = rects.reduce((a, b) => area(b) > area(a) ? b : a);
+		if (main.height >= .8 * (bottom - top)) return rects.map((r) => r === main ? "Figure" : "Detail");
+		const order = rects.map((r, i) => ({
+			r,
+			i
+		})).sort((a, b) => a.r.y - b.r.y);
+		const names = [];
+		order.forEach(({ i }, k) => names[i] = k === 0 ? "Head" : k === 1 ? "Body" : "Detail");
+		return names;
+	}
+	//#endregion
+	//#region plugin/src/usecase.ts
+	var isLive$6 = (n) => Boolean(n) && !n.removed;
+	var ROLE_KEY = "mermapix:role";
+	function describe$1(v) {
+		const cls = classifyShape(pathDataOf(v), v.width, v.height);
+		return {
+			rect: absRect(v),
+			painted: hasFill(v) || hasStroke(v),
+			rectLike: cls.rectLike && cls.kind !== "Circle" && cls.kind !== "Stadium",
+			ellipse: cls.kind === "Ellipse" || cls.kind === "Circle"
+		};
+	}
+	function convertActor(group, id, parts) {
+		const hit = parts.vectors.filter((v) => !(hasFill(v) || hasStroke(v)));
+		const figure = parts.vectors.filter((v) => hasFill(v) || hasStroke(v));
+		if (figure.length === 0 || parts.texts.length === 0) return null;
+		const parentNode = group.parent;
+		const index = parentNode.children.indexOf(group);
+		const label = labelOf(actorNameTexts(figure.map(absRect), parts.texts.map(absRect)).map((i) => parts.texts[i]));
+		const rects = [
+			...hit,
+			...figure,
+			...parts.texts
+		].map((n) => _objectSpread2(_objectSpread2({}, rebase(n.x, n.y, n.parent, parentNode)), {}, {
+			width: n.width,
+			height: n.height
+		}));
+		const box = hit.length > 0 ? rects.slice(0, hit.length).reduce((a, b) => b.width * b.height > a.width * a.height ? b : a) : null;
+		const x0 = box ? box.x : Math.min(...rects.map((r) => r.x));
+		const y0 = box ? box.y : Math.min(...rects.map((r) => r.y));
+		const x1 = box ? box.x + box.width : Math.max(...rects.map((r) => r.x + r.width));
+		const y1 = box ? box.y + box.height : Math.max(...rects.map((r) => r.y + r.height));
+		const frame = figma.createFrame();
+		frame.name = `Actor: ${label || id}`;
+		frame.layoutMode = "NONE";
+		frame.resize(Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+		parentNode.insertChild(index, frame);
+		frame.x = x0;
+		frame.y = y0;
+		frame.fills = [];
+		frame.strokes = [];
+		frame.clipsContent = false;
+		const names = actorPartNames(figure.map((v) => _objectSpread2(_objectSpread2({}, rebase(v.x, v.y, v.parent, parentNode)), {}, {
+			width: v.width,
+			height: v.height
+		})));
+		figure.forEach((v, i) => {
+			const rel = rebase(v.x, v.y, v.parent, parentNode);
+			frame.appendChild(v);
+			v.x = rel.x - x0;
+			v.y = rel.y - y0;
+			v.name = names[i];
+		});
+		for (const t of parts.texts) {
+			const rel = rebase(t.x, t.y, t.parent, parentNode);
+			const cx = rel.x + t.width / 2 - x0;
+			const cy = rel.y + t.height / 2 - y0;
+			styleShapeText(t);
+			frame.appendChild(t);
+			t.x = cx - t.width / 2;
+			t.y = cy - t.height / 2;
+			try {
+				t.constraints = {
+					horizontal: "CENTER",
+					vertical: "MAX"
+				};
+			} catch (_unused) {}
+		}
+		for (const v of hit) try {
+			v.remove();
+		} catch (_unused2) {}
+		try {
+			group.remove();
+		} catch (_unused3) {}
+		tag(frame, "mermapix:node", id);
+		tag(frame, CLUSTER_LABEL_KEY, label || id);
+		tag(frame, "mermapix:kind", "Actor");
+		tag(frame, ROLE_KEY, "actor");
+		return frame;
+	}
+	function convertPackage(group, id, parts) {
+		const [a, b] = parts.vectors;
+		const tabVec = a.width * a.height <= b.width * b.height ? a : b;
+		const bodyVec = tabVec === a ? b : a;
+		const parentNode = group.parent;
+		const index = parentNode.children.indexOf(group);
+		const title = labelOf(parts.texts);
+		const tabClass = classifyShape(pathDataOf(tabVec), tabVec.width, tabVec.height);
+		const bodyClass = classifyShape(pathDataOf(bodyVec), bodyVec.width, bodyVec.height);
+		const tabRect = rebase(tabVec.x, tabVec.y, tabVec.parent, parentNode);
+		const bodyRect = rebase(bodyVec.x, bodyVec.y, bodyVec.parent, parentNode);
+		const x0 = Math.min(tabRect.x, bodyRect.x);
+		const y0 = Math.min(tabRect.y, bodyRect.y);
+		const x1 = Math.max(tabRect.x + tabVec.width, bodyRect.x + bodyVec.width);
+		const y1 = Math.max(tabRect.y + tabVec.height, bodyRect.y + bodyVec.height);
+		const tabText = parts.texts.find((t) => {
+			const r = rebase(t.x, t.y, t.parent, parentNode);
+			const cx = r.x + t.width / 2;
+			const cy = r.y + t.height / 2;
+			return cx >= tabRect.x && cx <= tabRect.x + tabVec.width && cy >= tabRect.y && cy <= tabRect.y + tabVec.height;
+		});
+		const tabFrame = tabText ? convertVectorWithLabel(tabVec, tabText, "Tab", tabClass) : paintFrameFromVectors([tabVec], tabClass, "Tab", parentNode);
+		const bodyFrame = paintFrameFromVectors([bodyVec], bodyClass, "Body", parentNode);
+		const container = figma.createFrame();
+		container.name = `Package: ${title || id}`;
+		container.layoutMode = "NONE";
+		container.resize(x1 - x0, y1 - y0);
+		parentNode.insertChild(Math.min(index, parentNode.children.length), container);
+		container.x = x0;
+		container.y = y0;
+		container.fills = [];
+		container.strokes = [];
+		container.clipsContent = false;
+		for (const f of [tabFrame, bodyFrame]) {
+			const rel = rebase(f.x, f.y, f.parent, parentNode);
+			container.appendChild(f);
+			f.x = rel.x - x0;
+			f.y = rel.y - y0;
+		}
+		for (const t of parts.texts) {
+			if (t === tabText) continue;
+			const rel = rebase(t.x, t.y, t.parent, parentNode);
+			styleShapeText(t);
+			container.appendChild(t);
+			t.x = rel.x - x0;
+			t.y = rel.y - y0;
+		}
+		try {
+			group.remove();
+		} catch (_unused4) {}
+		tag(container, CLUSTER_ID_KEY, id);
+		tag(container, CLUSTER_LABEL_KEY, title || id);
+		tag(container, "mermapix:kind", "Package");
+		tag(container, ROLE_KEY, "package");
+		return container;
+	}
+	/** Converts the actors, use cases, notes and boundaries of a use case payload; nests them into their boundary. */
+	function convertUsecase(root) {
+		const result = {
+			actors: 0,
+			usecases: 0,
+			notes: 0,
+			boundaries: 0
+		};
+		const groups = [];
+		const find = (n) => {
+			if (!isLive$6(n) || !("children" in n)) return;
+			for (const c of [...n.children]) {
+				if (!isLive$6(c) || c.type !== "GROUP") continue;
+				const id = usecaseNodeId(c.name);
+				if (id !== null) groups.push({
+					group: c,
+					id
+				});
+				else find(c);
+			}
+		};
+		find(root);
+		const todo = groups.map(({ group, id }) => {
+			const parts = collectParts(group);
+			return {
+				group,
+				id,
+				parts,
+				role: parts.others.length > 0 ? null : classifyUsecaseGroup({
+					id,
+					vectors: parts.vectors.map(describe$1),
+					texts: parts.texts.map(absRect)
+				})
+			};
+		}).filter((g) => g.role !== null);
+		for (const role of [
+			"boundary",
+			"package",
+			"actor",
+			"note",
+			"usecase"
+		]) for (const { group, id, parts, role: r } of todo) {
+			if (r !== role || !isLive$6(group)) continue;
+			if (role === "boundary") {
+				const v = parts.vectors[0];
+				tag(convertClusterGroup({
+					group,
+					id,
+					vector: v,
+					texts: parts.texts
+				}, {
+					prefix: "System Boundary",
+					kind: "System Boundary"
+				}).frame, ROLE_KEY, "boundary");
+				result.boundaries++;
+			} else if (role === "package") {
+				if (convertPackage(group, id, parts)) result.boundaries++;
+			} else if (role === "actor") {
+				if (convertActor(group, id, parts)) result.actors++;
+			} else {
+				const res = convertShapeGroup(group, { nodeId: id });
+				if (!res) continue;
+				const label = res.label || id;
+				res.frame.name = role === "note" ? `Note: ${label}` : `Use Case: ${label}`;
+				tag(res.frame, CLUSTER_LABEL_KEY, label);
+				tag(res.frame, ROLE_KEY, role);
+				for (const k of res.frame.children) if (k.type === "VECTOR" && k.width * k.height < .5 * res.frame.width * res.frame.height) k.name = "Detail";
+				if (role === "note") {
+					tag(res.frame, "mermapix:kind", "Note");
+					result.notes++;
+				} else result.usecases++;
+			}
+		}
+		if (result.actors + result.usecases + result.notes + result.boundaries === 0) return result;
+		nestIntoClusters(root);
 		return result;
 	}
 	//#endregion
@@ -4396,7 +4804,9 @@
 		"eventmodeling",
 		"wardley",
 		"ishikawa",
-		"treeview"
+		"treeview",
+		"usecase",
+		"agentflow"
 	]);
 	function fallbackMode(diagramType) {
 		const t = (diagramType || "").trim().toLowerCase();
@@ -4421,12 +4831,17 @@
 	function isRawMermaidId(name) {
 		return /mermaid-(svg-)?\d+(-|$)/.test(String(name !== null && name !== void 0 ? name : ""));
 	}
-	/** `mermaid-svg-0-Todo` -> `Todo` (the user-facing id), '' when nothing is left. */
+	/**
+	* `mermaid-svg-0-Todo` -> `Todo` (the user-facing id), '' when nothing is left. Mermaid 12.3.0 prefixes the
+	* block diagram's edge ids twice (`mermaid-svg-0-mermaid-svg-0-1-a-b`), so the prefix is stripped repeatedly.
+	*/
 	function cleanRawId(name) {
 		const n = String(name !== null && name !== void 0 ? name : "");
 		if (/^mermaid-(?:svg-)?\d+$/.test(n)) return "";
-		const m = /^.*?mermaid-(?:svg-)?\d+-(.+)$/.exec(n);
-		return (m ? m[1] : n).replace(/-\d+$/, "").trim();
+		const prefixed = /^.*?mermaid-(?:svg-)?\d+-(.+)$/;
+		let id = n;
+		for (let m = prefixed.exec(id); m; m = prefixed.exec(id)) id = m[1];
+		return id.replace(/-\d+$/, "").trim();
 	}
 	/** Element kind of a vector from its path, bounds and paint. */
 	function vectorKind(data, width, height, hasFill) {
@@ -4917,11 +5332,29 @@
 			}
 		},
 		{
+			name: "usecase",
+			run: (rootNode, _theme, ctx) => {
+				if (!ctx || ctx.diagramType !== "usecase") return;
+				try {
+					convertUsecase(rootNode);
+				} catch (_unused) {}
+			}
+		},
+		{
+			name: "agentflow",
+			run: (rootNode, _theme, ctx) => {
+				if (!ctx || ctx.diagramType !== "agentflow") return;
+				try {
+					convertAgentflow(rootNode);
+				} catch (_unused2) {}
+			}
+		},
+		{
 			name: "sequence",
 			run: (rootNode) => {
 				try {
 					convertSequence(rootNode);
-				} catch (_unused) {}
+				} catch (_unused3) {}
 			}
 		},
 		{
@@ -4936,7 +5369,7 @@
 						kind: "Namespace"
 					});
 					nestIntoClusters(rootNode);
-				} catch (_unused2) {}
+				} catch (_unused4) {}
 			}
 		},
 		{
@@ -4944,7 +5377,7 @@
 			run: (rootNode) => {
 				try {
 					convertStates(rootNode);
-				} catch (_unused3) {}
+				} catch (_unused5) {}
 			}
 		},
 		{
@@ -4953,7 +5386,7 @@
 				if (!ctx || ctx.diagramType !== "treemap") return;
 				try {
 					convertTreemap(rootNode);
-				} catch (_unused4) {}
+				} catch (_unused6) {}
 			}
 		},
 		{
@@ -4962,7 +5395,7 @@
 				if (!ctx || !isRailroadType(ctx.diagramType)) return;
 				try {
 					convertRailroad(rootNode);
-				} catch (_unused5) {}
+				} catch (_unused7) {}
 			}
 		},
 		{
@@ -4973,7 +5406,11 @@
 		},
 		{
 			name: "connectors",
-			run: (rootNode) => {
+			run: (rootNode, _theme, ctx) => {
+				if (ctx && ctx.diagramType === "agentflow") {
+					arrangeFlowchart(rootNode, { classifyEdge: (vector, markers) => agentflowEdgeStyle(markers.map((m) => markerKindOfLayer(m.name)).filter(Boolean), isRealDash(vector.dashPattern)) });
+					return;
+				}
 				arrangeFlowchart(rootNode);
 			}
 		},
@@ -4982,7 +5419,7 @@
 			run: (rootNode, _theme, ctx) => {
 				try {
 					applyGenericFallback(rootNode, ctx && ctx.diagramType);
-				} catch (_unused6) {}
+				} catch (_unused8) {}
 			}
 		}
 	];
@@ -5000,7 +5437,7 @@
 				opacity: 1,
 				visible: true
 			}];
-		} catch (_unused7) {}
+		} catch (_unused9) {}
 	}
 	function optimizeDiagramNodes(rootNode, themeVariables, diagramType) {
 		purgeJunkNodes(rootNode);
@@ -5356,6 +5793,14 @@
 						kind: "cluster",
 						id: clusterId
 					});
+					if (kind === "Package") {
+						const tab = liveChildren(n).find((c) => c.type === "FRAME" && c.name === "Tab");
+						const tabTexts = tab ? directTexts(tab) : [];
+						if (tabTexts.length === 1) out.set(tabTexts[0], {
+							kind: "cluster",
+							id: clusterId
+						});
+					}
 				}
 			}
 			for (const c of liveChildren(n)) visit(c);

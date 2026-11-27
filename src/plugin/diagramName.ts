@@ -14,7 +14,6 @@ const TYPE_NAMES: Record<string, string> = {
   graph: 'Flowchart',
   erdiagram: 'ER diagram',
   sequencediagram: 'Sequence diagram',
-  zenuml: 'Sequence diagram',
   classdiagram: 'Class diagram',
   'classdiagram-v2': 'Class diagram',
   statediagram: 'State diagram',
@@ -48,6 +47,10 @@ const TYPE_NAMES: Record<string, string> = {
   treemap: 'Treemap',
   'treemap-beta': 'Treemap',
   // Names where humanizing the keyword would read badly.
+  'usecase-beta': 'Use case diagram',
+  usecase: 'Use case diagram',
+  'agentflow-beta': 'Agent flow diagram',
+  agentflow: 'Agent flow diagram',
   eventmodeling: 'Event model',
   wardley: 'Wardley map',
   'wardley-beta': 'Wardley map',

@@ -6,7 +6,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { walk } from '../plugin-mock/figma-mock.mjs'
 import { importSvg } from '../plugin-mock/svg-import.mjs'
-import { runFixture } from '../plugin-mock/run-fixture.mjs'
+import { runFixture, runSvg } from '../plugin-mock/run-fixture.mjs'
 import { layoutVertical } from '../plugin-mock/layout-sim.mjs'
 import { isGenericName, relBounds } from '../plugin-mock/survey-metrics.mjs'
 import { vectorPolyline } from '../../plugin/src/connectorGeometry.ts'
@@ -242,4 +242,13 @@ test('[class extras/dark] generics, label, lollipop interface, free note, cardin
   assert.ok(edges.some((e) => e.children.some((k) => k.name === 'Lollipop')))
   const bad = all(r.root, (n, p) => n !== r.root && isGenericName(n.name) && !(n.name === 'Line' && p && p.name.startsWith('Edge: ')))
   assert.deepEqual(bad.map((n) => `${n.type}:${n.name}`), [])
+})
+
+test('[class/dark] the converters do not depend on the root `aria-roledescription` (12.3.0: classDiagram, 11.16.1: class)', async () => {
+  const modern = await runFixture(EXAMPLE, 'dark')
+  assert.match(modern.svg, /aria-roledescription="classDiagram"/, 'the payload is a Mermaid 12 export')
+  const legacy = await runSvg(modern.svg.replace('aria-roledescription="classDiagram"', 'aria-roledescription="class"'), 'dark')
+  const names = (tree) => all(tree, () => true).map((n) => `${n.type}:${n.name}`)
+  assert.deepEqual(names(legacy.root), names(modern.root))
+  assert.ok(!modern.root.pluginData?.['mermapix:fallback'], 'the generic fallback stays away from class diagrams')
 })

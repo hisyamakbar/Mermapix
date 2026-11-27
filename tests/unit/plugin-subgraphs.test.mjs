@@ -354,6 +354,8 @@ test('label association: nearest edge wins, far or ambiguous labels stay unassig
   const edges = [{ pts: line(0, 0, 100, 0) }, { pts: line(0, 200, 100, 200) }, { pts: line(0, 210, 100, 210) }]
   assert.deepEqual(assignLabelsToEdges(edges, [{ x: 50, y: 3 }]), [0])
   assert.deepEqual(assignLabelsToEdges(edges, [{ x: 50, y: 100 }]), [-1], 'too far from every edge')
+  // Mermaid 12.3.0 puts a class relation label up to 33px off its curve (11.16.1: 25px); it still belongs to the line it is nearest to
+  assert.deepEqual(assignLabelsToEdges([{ pts: line(0, 0, 100, 0) }, { pts: line(0, 83, 100, 83) }], [{ x: 50, y: 33 }]), [0], '33px off its own line, 50px off the next')
   assert.deepEqual(assignLabelsToEdges(edges, [{ x: 50, y: 205 }]), [-1], 'between two close edges = ambiguous')
   assert.deepEqual(assignLabelsToEdges([], [{ x: 0, y: 0 }]), [-1])
 })

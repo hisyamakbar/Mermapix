@@ -39,6 +39,8 @@ const NODE_TYPES = new Set([
   'wardley',
   'ishikawa',
   'treeview',
+  'usecase',
+  'agentflow',
 ])
 
 export function fallbackMode(diagramType: string | null | undefined): FallbackMode {
@@ -68,13 +70,17 @@ export function isRawMermaidId(name: string | null | undefined): boolean {
   return /mermaid-(svg-)?\d+(-|$)/.test(String(name ?? ''))
 }
 
-/** `mermaid-svg-0-Todo` -> `Todo` (the user-facing id), '' when nothing is left. */
+/**
+ * `mermaid-svg-0-Todo` -> `Todo` (the user-facing id), '' when nothing is left. Mermaid 12.3.0 prefixes the
+ * block diagram's edge ids twice (`mermaid-svg-0-mermaid-svg-0-1-a-b`), so the prefix is stripped repeatedly.
+ */
 export function cleanRawId(name: string | null | undefined): string {
   const n = String(name ?? '')
   if (/^mermaid-(?:svg-)?\d+$/.test(n)) return ''
-  const m = /^.*?mermaid-(?:svg-)?\d+-(.+)$/.exec(n)
-  const id = (m ? m[1] : n).replace(/-\d+$/, '')
-  return id.trim()
+  const prefixed = /^.*?mermaid-(?:svg-)?\d+-(.+)$/
+  let id = n
+  for (let m = prefixed.exec(id); m; m = prefixed.exec(id)) id = m[1]
+  return id.replace(/-\d+$/, '').trim()
 }
 
 export type VectorKind = 'Line' | 'Curve' | 'Rectangle' | 'Rounded Rectangle' | 'Stadium' | 'Circle' | 'Ellipse' | 'Diamond' | 'Hexagon' | 'Parallelogram' | 'Trapezoid' | 'Polygon' | 'Shape'

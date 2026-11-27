@@ -1,0 +1,18 @@
+usecase-beta
+direction TB
+actor Cust("Customer")@{ business: true }
+actor Bot("Bot")@{ icon: "fa:robot" }
+systemBoundary a["Front office"]
+  Order("Place order")@{ business: true }
+  Login("Log in") <<Entry>>
+  Plain[Plain rect]
+end
+systemBoundary b["Back office"]
+  Ship("Ship")
+end
+Cust --> Order
+Cust --> Login
+Bot --x Ship
+Order --> Ship
+Plain --> Undeclared
+note for Cust "VIP only"

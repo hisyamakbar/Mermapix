@@ -10,13 +10,17 @@
  * Invariant: stripping tags and unescaping the output yields the input exactly.
  */
 
+import { DIAGRAM_KEYWORDS } from '../utils/diagramSupport.ts'
+
 function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+// Header keywords of every diagram type Mermapix converts come from the one list in diagramSupport.ts
+// (stateDiagram-v2, usecase-beta, agentflow-beta, ...); the rest are words inside diagrams.
 const KEYWORDS = new Set([
-  'erDiagram', 'flowchart', 'graph', 'sequenceDiagram', 'classDiagram', 'stateDiagram',
-  'gitGraph', 'mindmap', 'subgraph', 'end', 'direction', 'TB', 'TD', 'BT', 'RL', 'LR',
+  ...Object.values(DIAGRAM_KEYWORDS).flat(),
+  'subgraph', 'end', 'direction', 'TB', 'TD', 'BT', 'RL', 'LR',
   'participant', 'actor', 'autonumber', 'activate', 'deactivate', 'class', 'note',
   'loop', 'alt', 'else', 'opt', 'par', 'and', 'rect', 'critical', 'break',
 ])
@@ -36,7 +40,8 @@ const TOKEN_RE = new RegExp(
     '("[^"]*"?|\'[^\']*\'?)',
     // ERD cardinalities, class relations, flowchart & sequence arrows
     '([|}o][|o]--[|o][|{o]|[|}o][|o]\\.\\.[|o][|{o]|<\\|--|--\\|>|\\*--|--\\*|o--|--o|<\\.\\.|\\.\\.>|-->>|--x|--\\)|->>|-\\)|-x|-\\.->|==>|-->|---|--|->)',
-    '([A-Za-z_][A-Za-z0-9_]*)',
+    // A word, with a `-beta` / `-v2` / `-ebnf-beta` ending kept whole so header keywords match (usecase-beta).
+    '([A-Za-z_][A-Za-z0-9_]*(?:-(?:ebnf|abnf|peg|elk))?(?:-(?:beta|v\\d+))?)',
   ].join('|'),
   'y',
 )

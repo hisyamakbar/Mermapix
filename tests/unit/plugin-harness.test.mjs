@@ -7,6 +7,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runPlugin, walk } from '../plugin-mock/figma-mock.mjs'
 import { buildErdScene, COLORS } from '../plugin-mock/erd-scene.mjs'
+import { runFixture } from '../plugin-mock/run-fixture.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const CODE = path.resolve(here, '../../plugin/code.js')
@@ -107,4 +108,16 @@ test('showUI asks for themeColors, so Figma adds figma-light / figma-dark to the
   assert.equal(options.themeColors, true)
   assert.equal(options.width, 500)
   assert.equal(options.height, 680)
+})
+
+test('Mermaid 12.3.0 ERD payload: six Auto Layout tables, the CATEGORY self-relationship is one free-form edge with both crow\'s feet', async () => {
+  const run = await runFixture('1-ex-erd', 'dark')
+  assert.match(run.svg, /id="mermaid-svg-0-id_entity-CATEGORY-4_entity-CATEGORY-4_4"/, 'self-relationship = one ordinary relationship path (11.16.1 drew three cyclic-special pieces)')
+  assert.ok(!/cyclic-special/.test(run.svg))
+  assert.deepEqual(tableFrames(run.tree).map((n) => n.name).sort(), ['CATEGORY', 'CUSTOMER', 'ORDER', 'ORDER_ITEM', 'PAYMENT', 'PRODUCT'])
+  const edges = find(run.tree, (n) => n.type === 'VECTOR' && /id_entity-CATEGORY-4_entity-CATEGORY-4_4$/.test(n.name))
+  assert.equal(edges.length, 1)
+  const feet = find(run.tree, (n) => n.type === 'GROUP' && /Crow's Foot/.test(n.name)).map((n) => n.name)
+  assert.equal(feet.length, 12, 'two crow\'s feet per relationship, six relationships')
+  assert.equal(find(run.tree, (n) => n.type === 'FRAME' && n.name.startsWith('Label: ')).length, 6, 'one label pill per relationship')
 })

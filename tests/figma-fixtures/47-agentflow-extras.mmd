@@ -1,0 +1,14 @@
+agentflow-beta LR
+  global
+    gh["GitHub"]@{ shape: refdoc }
+  end
+  connector api["Orders API"]
+  a["Start"]@{ shape: input }
+  b["Plain node"]
+  c["Round"]@{ shape: round }
+  d{{"Hex"}}
+  a --> b --> c
+  b -.- gh
+  c --x d
+  d -- retry --> a
+  b --> api

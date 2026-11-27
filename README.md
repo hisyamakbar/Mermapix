@@ -9,7 +9,7 @@
 [![CI](https://github.com/hisyamakbar/Mermapix/actions/workflows/ci.yml/badge.svg)](https://github.com/hisyamakbar/Mermapix/actions/workflows/ci.yml)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-ec4899.svg)](CONTRIBUTING.md)
 [![Contrast: audited](https://img.shields.io/badge/Contrast-WCAG_AA_audited-cyan.svg)](tests/color-audit.mjs)
-[![Version](https://img.shields.io/badge/version-1.2.0-ec4899.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.0-ec4899.svg)](CHANGELOG.md)
 
 **Get the Figma plugin:** [Mermapix on Figma Community](https://www.figma.com/community/plugin/1693698850206280915) (Figma Design and FigJam, free, works offline). **Try the web app:** [mermapix.hisyamakbar.com](https://mermapix.hisyamakbar.com) (no install).
 
@@ -33,8 +33,8 @@ Diagrams go into Figma through the plugin: native frames, Auto Layout ERD tables
 ## ✨ Key Features
 
 - 🏗️ **Native Auto Layout ERD Frames** *(Plugin)*: Converts database entities into vertical Auto Layout frames. Add or delete fields directly in Figma and the container card responds naturally.
-- 🧩 **Native frames for every diagram type** *(Plugin)*: flowchart and sitemap nodes and subgraphs, sequence participants, notes and alt/loop blocks, class boxes, states, treemap sections and railroad boxes all become frames with fill + border merged; connectors are grouped as `Edge: A → B`. Gantt, pie, mindmap, timeline, journey, C4 and the rest keep their geometry with semantic layer names.
-- 🔁 **Edit after insert** *(Plugin, 1.2.0)*: every inserted diagram remembers its Mermaid code. Select it in Figma, choose **Edit source**, and the diagram follows your code as you type, in place. Text you change directly on the canvas goes back into the code. See [Editing a diagram after inserting it](#-editing-a-diagram-after-inserting-it).
+- 🧩 **Native frames for every diagram type** *(Plugin)*: flowchart and sitemap nodes and subgraphs, sequence participants, notes and alt/loop blocks, class boxes, states, use cases and actors, agentflow nodes and flows, treemap sections and railroad boxes all become frames with fill + border merged; connectors are grouped as `Edge: A → B`. Gantt, pie, mindmap, timeline, journey, C4 and the rest keep their geometry with semantic layer names.
+- 🔁 **Edit after insert** *(Plugin, since 1.2.0)*: every inserted diagram remembers its Mermaid code. Select it in Figma, choose **Edit source**, and the diagram follows your code as you type, in place. Text you change directly on the canvas goes back into the code. See [Editing a diagram after inserting it](#-editing-a-diagram-after-inserting-it).
 - 🧼 **Clean Layers (No Redundant Groups)**: Dissolves nested SVG wrapper groups so you can double-click and edit text instantly.
 - 🗄️ **DBML & SQL Schema Import**: Instantly convert raw DBML or SQL `CREATE TABLE` definitions (Postgres/MySQL) into structured Mermaid ERD diagrams.
 - 🎨 **Light & Dark Theme Sync**: Toggle between Light (clean neutral) and Dark (midnight cyan). A 12-color categorical palette gives treemaps, mindmaps, timelines, pies and git graphs distinct colors, and every theme is checked by an automated contrast audit (WCAG AA: text ≥ 4.5:1, lines ≥ 3:1).
@@ -114,7 +114,7 @@ For contributors, or to try a change before it is published, run the plugin as a
 
 To test a specific release instead, download `mermapix-figma-plugin-<version>.zip` from the [releases page](https://github.com/hisyamakbar/Mermapix/releases), unzip it and import its `manifest.json` the same way.
 
-> While Figma reviews 1.2.0, the Community listing may still serve 1.1.0, which does not include [editing a diagram after inserting it](#-editing-a-diagram-after-inserting-it). Run the plugin from source or the 1.2.0 release zip to try it.
+> While Figma reviews 1.3.0, the Community listing may still serve 1.2.0, which does not convert use case and agentflow diagrams. Run the plugin from source or the 1.3.0 release zip to try them.
 
 **Regression pass in real Figma**: import `plugin-dev/manifest.json` (Mermapix Test Runner, developer only) and click **Run all**. It inserts every `tests/figma-fixtures/*.mmd` in light and dark on a new page and stores an audit you can read back with `tests/figma-read-audit.js` (see `tests/README.md`).
 
@@ -122,7 +122,7 @@ To test a specific release instead, download `mermapix-figma-plugin-<version>.zi
 
 ## 🔁 Editing a diagram after inserting it
 
-*Plugin 1.2.0. Until 1.2.0 is live on Figma Community, run the plugin from this repository or the 1.2.0 release zip.*
+*Plugin 1.2.0 and later.*
 
 1. **Insert** a diagram with the plugin. Its Mermaid code and theme are stored on the diagram, inside your Figma file.
 2. **Select** the diagram or any layer inside it. The plugin shows "Diagram selected" with **Edit source**. Figma also shows an **Edit diagram** button for the selected diagram.

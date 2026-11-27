@@ -1,0 +1,16 @@
+usecase-beta
+actor Clerk("Clerk")@{ type: hollow }
+actor Guest("Guest")@{ type: awesome }
+actor Auditor("Auditor")
+actor Staff("Staff")
+note for Staff "Generalises Clerk"
+systemBoundary billing["Billing"]@{ type: package }
+  Invoice("Create invoice")
+  Receipt[Print receipt]
+  Refund("Refund order")
+end
+Clerk --> Invoice
+Guest -- "views" --> Receipt
+Auditor --o Refund
+Clerk --|> Staff
+Refund --|> Invoice

@@ -1,0 +1,9 @@
+flowchart-elk LR
+  paste[Paste Mermaid] --> valid{Valid syntax?}
+  valid -- yes --> preview[Live preview]
+  valid -- no --> fix[Show error]
+  fix --> paste
+  subgraph Export
+    preview --> figma[Insert in Figma]
+    preview --> svg[Download SVG]
+  end

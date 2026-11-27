@@ -1,0 +1,20 @@
+agentflow-beta TB
+  flow team["Support team"]
+    flow triage["Triage agent"]
+      ticket["New ticket"]@{ shape: input }
+      classify["Classify request"]@{ shape: task }
+      lookup["search_orders"]@{ shape: tool }
+      known["Known issue?"]@{ shape: decision }
+      ticket --> classify --> lookup --> known
+    end
+    flow resolve["Resolver agent"]
+      fix["Draft reply"]@{ shape: task }
+      send["send_email"]@{ shape: action }
+      policy["Refund policy"]@{ shape: refdoc }
+      fix --> send
+      fix -.- policy
+    end
+    known -- yes --> fix
+    known -- no --> escalate["Escalate to human"]
+    send --x escalate
+  end

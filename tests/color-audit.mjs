@@ -25,6 +25,13 @@
 //           hidden for the backdrop screenshot. Catches labels that the export drops
 //           or recolours.
 //
+// Phase 14 adds one structural check, kind `hidden-paint`: an element whose own computed
+// opacity is 0 but that still has a fill or stroke. The SVG export rewrites every opacity 0
+// to 1 (src/export/svg.ts), so such an element lands in Figma as a visible shape (use case
+// actor hit area: a solid black/white box; class diagram lollipop interface). `themeCSS` in
+// src/themes/presets.ts removes the paint of these rectangles; any other element found here
+// needs the same treatment or an svg.ts change.
+//
 // Usage:
 //   node tests/color-audit.mjs --label after --out <dir>
 //   node tests/color-audit.mjs --only 37,38 --themes dark
@@ -143,6 +150,22 @@ const PAGE_HIDE_TEXT = `(() => {
   style.textContent = '.diagram-stage svg text, .diagram-stage svg tspan { visibility: hidden !important; fill: transparent !important; stroke: none !important; text-shadow: none !important } .diagram-stage svg foreignObject, .diagram-stage svg foreignObject * { color: transparent !important; text-shadow: none !important }'
   document.head.appendChild(style)
   return true
+})()`
+
+// Elements the diagram hides with opacity 0 but leaves painted (see the header).
+const PAGE_HIDDEN_PAINT = `(() => {
+  const svg = document.querySelector('.diagram-stage svg')
+  if (!svg) return []
+  const out = []
+  for (const el of svg.querySelectorAll('*')) {
+    if (el.closest('defs, clipPath, marker, mask, symbol, pattern')) continue
+    const s = getComputedStyle(el)
+    if (s.opacity !== '0' || s.display === 'none') continue
+    const fill = s.fill && s.fill !== 'none' && s.fill !== 'transparent'
+    const stroke = s.stroke && s.stroke !== 'none' && parseFloat(s.strokeWidth || '0') > 0
+    if (fill || stroke) out.push({ tag: el.tagName.toLowerCase(), cls: el.getAttribute('class') || '', fill: s.fill, stroke: s.stroke })
+  }
+  return out
 })()`
 
 const PAGE_AUDIT = `(async (bgHex, shotB64) => {
@@ -467,6 +490,9 @@ try {
         row.renderError = "no svg rendered"
         results.push(row)
         continue
+      }
+      for (const h of await evaluate(cdp, PAGE_HIDDEN_PAINT)) {
+        row.failures.push({ kind: "hidden-paint", tag: h.tag, cls: h.cls, fg: h.fill, bg: h.stroke, ratio: 0, need: 1 })
       }
       await evaluate(cdp, PAGE_HIDE_TEXT)
       await sleep(80)

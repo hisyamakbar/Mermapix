@@ -2,7 +2,7 @@
 
 A comprehensive, step-by-step guide for publishing the **Mermapix: Mermaid to Editable Figma** plugin to the Figma Community in full compliance with the [Figma Plugin and Widget Review Guidelines](https://help.figma.com/hc/en-us/articles/360039958914-Plugin-and-widget-review-guidelines).
 
-> **Status:** v1.1.0 was approved and published on Figma Community on 2026-11-19: https://www.figma.com/community/plugin/1693698850206280915 (plugin id `1693698850206280915`). **v1.2.0** (edit after insert) is the next update; its submission copy is in section 8.
+> **Status:** v1.1.0 was approved and published on Figma Community on 2026-11-19: https://www.figma.com/community/plugin/1693698850206280915 (plugin id `1693698850206280915`). **v1.2.0** (edit after insert) was approved on its first review. **v1.3.0** (use case and agentflow diagrams, Mermaid 12) is the next update; its submission copy is in section 9.
 >
 > **Data storage answer changed in v1.2.0.** v1.2.0 stores each inserted diagram's Mermaid code (plus theme and diagram type) as private plugin data on the diagram's root node, so a diagram can be edited after it is inserted. That data lives only inside the user's own Figma file (via `setPluginData`), is never sent anywhere, and the plugin stays offline. Answer **"Does this plugin collect or store user data?"** with the v1.2.0 text in section 5, use the v1.2.0 privacy line in section 6, and mention edit after insert in the listing (section 8).
 
@@ -190,6 +190,37 @@ Figma reviewers require answers to safety and compliance questions during submis
 
 4. **Questionnaire:** "collect or store user data" = the v1.2.0 answer in section 5. Network access: No (unchanged).
 5. **Privacy line:** the v1.2.0 line in section 6.
+
+---
+
+## 9. v1.3.0 Submission Copy (paste into the publish dialog)
+
+1. Run `pnpm build:plugin`, then in Figma Desktop: Plugins > Development > Mermapix (from `plugin/manifest.json`) > **Publish new version**.
+2. **Version notes ("What's new"):**
+
+   ```
+   Use case and agentflow diagrams, now on Mermaid 12
+
+   New
+   - Use case diagrams: each actor is one movable unit, use cases become frames with editable labels, system boundaries and packages become containers, and «include» / «extend» labels stay with their lines.
+   - Agentflow diagrams: flows become nested containers and nodes are named by kind (Task, Tool, Decision, Input, Action).
+   - flowchart-elk diagrams convert like other flowcharts.
+   - A clear message when a diagram type is not supported (ZenUML) or the first keyword is mistyped, with a suggestion for the right one.
+   - Thinner scrollbars that follow the theme.
+
+   Changed
+   - Updated to Mermaid 12. Flowchart, class, ER and state diagrams keep the look they had before. A few diagrams are laid out differently by Mermaid 12: flowcharts with a direction inside a subgraph, C4, block and swimlane.
+
+   Fixed
+   - Dark theme: white plot background in XY charts, white excluded days in gantt charts, white markers and annotation boxes in Wardley maps.
+   - Light theme: active gantt tasks shown white on white, invisible gantt grid lines.
+   - Long axis labels cut off in radar charts.
+   - A stray box behind lollipop interface labels in class diagrams.
+   - Relation labels in class and state diagrams separated from their line.
+   ```
+
+3. **Listing description:** where the description lists diagram types, add "use case" and "agentflow". No other change.
+4. **Questionnaire and privacy line:** unchanged from v1.2.0 (data is stored only inside the user's own file; network access: No). The manifest is unchanged: no new permissions.
 
 ---
 

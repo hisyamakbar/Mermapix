@@ -157,6 +157,19 @@ function makeGroup(members: any[], parent: any, name: string): any | null {
   }
 }
 
+/** How a diagram type wants its connectors named (agentflow: sequence / reference / failure edges). */
+export interface EdgeStyle {
+  /** Layer name of the edge line inside its group (default `Line`). */
+  line?: string
+  /** Appended to the group name (`Edge: A → B (failure)`). */
+  suffix?: string
+}
+
+export interface ArrangeOptions {
+  /** Called once per edge with its line vector and marker groups; null keeps the defaults. */
+  classifyEdge?: (vector: any, markers: any[]) => EdgeStyle | null
+}
+
 export interface ConnectorsResult {
   edges: number
   grouped: number
@@ -168,7 +181,7 @@ export interface ConnectorsResult {
  * Arranges the flowchart root: top-level subgraph frames, loose node frames, then `Connectors`.
  * Everything keeps its absolute position (members are only reparented / grouped).
  */
-export function arrangeFlowchart(root: any): ConnectorsResult {
+export function arrangeFlowchart(root: any, options: ArrangeOptions = {}): ConnectorsResult {
   const result: ConnectorsResult = { edges: 0, grouped: 0, labelsInEdges: 0, labelsLoose: 0 }
   if (!isLive(root) || root.type !== 'FRAME') return result
 
@@ -221,9 +234,10 @@ export function arrangeFlowchart(root: any): ConnectorsResult {
       ? resolveEdgeEndpoints(e.body, known)
       : resolveEdgeEndpointsByGeometry(e.pts, targets)
     const label = (id: string): string => labelMap.get(id) || id
-    const name = ends ? edgeDisplayName(label(ends.from), label(ends.to)) : `Edge: ${e.body || 'Connector'}`
+    const style = options.classifyEdge ? options.classifyEdge(e.vector, e.markers) : null
+    const name = (ends ? edgeDisplayName(label(ends.from), label(ends.to)) : `Edge: ${e.body || 'Connector'}`) + ((style && style.suffix) || '')
     try {
-      e.vector.name = 'Line'
+      e.vector.name = (style && style.line) || 'Line'
     } catch {}
     const members = [e.vector, ...e.markers, ...embedded[i]]
     for (const m of members) if (m.parent !== root) moveKeepingAbs(m, root, absRect(m))

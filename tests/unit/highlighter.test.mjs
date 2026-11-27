@@ -53,3 +53,14 @@ test('highlighter escapes HTML in plain text and strings', () => {
   assert.doesNotMatch(html, /<b>|<script>/)
   assert.equal(toText(html), src)
 })
+
+test('highlighter marks the header keyword of every diagram type, including -beta forms', async () => {
+  const { DIAGRAM_KEYWORDS } = await import('../../src/utils/diagramSupport.ts')
+  for (const keyword of Object.values(DIAGRAM_KEYWORDS).flat()) {
+    const html = highlightMermaid(`${keyword} TB`)
+    assert.match(html, new RegExp(`^<span class="tok-keyword">${keyword}</span> `), keyword)
+    assert.equal(toText(html), `${keyword} TB`)
+  }
+  // a hyphen that is not a version ending still tokenizes as before: word, arrow, word
+  assert.equal(highlightMermaid('a-->b'), 'a<span class="tok-arrow">--&gt;</span>b')
+})

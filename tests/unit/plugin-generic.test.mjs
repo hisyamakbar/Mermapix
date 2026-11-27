@@ -10,8 +10,9 @@ import { metrics, relBounds, isGenericName } from '../plugin-mock/survey-metrics
 import { diagramTypeFromSvg } from '../../plugin/src/genericGeometry.ts'
 
 const THEMES = ['dark', 'light']
-// Types that got a dedicated converter after 8.5 (the generic fallback must now stay away from them): treemap (9.2).
-const DEDICATED = new Set(['treemap'])
+// Types that got a dedicated converter after 8.5 (the generic fallback must now stay away from them): treemap (9.2),
+// use case and agentflow (Phase 14, plugin-usecase.test.mjs / plugin-agentflow.test.mjs).
+const DEDICATED = new Set(['treemap', 'usecase', 'usecase-variants', 'usecase-extras', 'agentflow', 'agentflow-extras'])
 const all = (tree, pred) => { const out = []; walk(tree, (n, p) => pred(n, p) && out.push(n)); return out }
 const near = (a, b, tol = 0.5) => Math.abs(a - b) <= tol
 const rectKey = (b) => `${b.x.toFixed(1)},${b.y.toFixed(1)},${b.width.toFixed(1)},${b.height.toFixed(1)}`

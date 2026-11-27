@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Exports every tests/figma-fixtures/*.mmd through the real "SVG" export button in
+// Exports every tests/figma-fixtures/*.mmd (or the *.mmd of --fixtures <dir>) through the real "SVG" export button in
 // both themes (what the plugin UI posts and what tests/fixtures/plugin/* hold), and
 // checks that the exported content lies inside the exported viewBox (plan Phase 10.1).
 //
@@ -12,7 +12,9 @@
 //   node tests/export-fixtures.mjs --out <dir>                 # <name>-<theme>.svg + report
 //   node tests/export-fixtures.mjs --out <dir> --shots <dir>   # also a PNG per export
 //   node tests/export-fixtures.mjs --only 37,40 --themes dark
+//   node tests/export-fixtures.mjs --fixtures tests/official-samples --out <dir>   # Mermaid's own samples (Phase 14)
 // Options:
+//   --fixtures <dir>                folder of .mmd files (default: tests/figma-fixtures)
 //   --url <http://localhost:8443>   app URL (dev server must be running)
 //   --chrome <path>                 Chrome binary (default: macOS Google Chrome)
 //   --port <9445>                   remote debugging port
@@ -40,7 +42,7 @@ const PORT = Number(args.port ?? 9445)
 const tolerance = Number(args.tolerance ?? 1)
 const themes = (args.themes ?? "light,dark").split(",")
 const only = args.only ? args.only.split(",") : null
-const fixturesDir = path.join(here, "figma-fixtures")
+const fixturesDir = args.fixtures && args.fixtures !== "true" ? path.resolve(args.fixtures) : path.join(here, "figma-fixtures")
 const BACKGROUNDS = { light: "#ffffff", dark: "#090d16" }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -114,7 +116,11 @@ async function exportFixture(cdp, code, theme) {
   await evaluate(cdp, `(() => { localStorage.setItem('mermapix:code', ${JSON.stringify(code)}); localStorage.setItem('mermapix:theme', ${JSON.stringify(theme)}) })()`)
   await cdp.send("Page.reload", { ignoreCache: true })
   await waitFor(cdp, "document.readyState === 'complete'")
-  if (!(await waitFor(cdp, "!!document.querySelector('.diagram-stage svg')"))) return null
+  if (!(await waitFor(cdp, "!!document.querySelector('.diagram-stage svg')"))) {
+    // Say why: the editor shows Mermaid's (or Mermapix's) error for code that does not render.
+    const reason = await evaluate(cdp, "document.querySelector('.editor-error .error-text')?.textContent ?? ''").catch(() => "")
+    return { error: reason.replace(/\s+/g, " ").trim().slice(0, 140) }
+  }
   await evaluate(cdp, "document.fonts.ready.then(() => true)")
   await sleep(700) // debounce + fit settle
   return evaluate(cdp, `(async () => {
@@ -212,7 +218,7 @@ try {
     const code = await readFile(path.join(fixturesDir, file), "utf8")
     for (const theme of themes) {
       const svg = await exportFixture(cdp, code, theme)
-      if (!svg) { rows.push({ name, theme, error: "no svg rendered" }); continue }
+      if (typeof svg !== "string") { rows.push({ name, theme, error: `no svg rendered${svg?.error ? `: ${svg.error}` : ""}` }); continue }
       await writeFile(path.join(outDir, `${name}-${theme}.svg`), svg)
       const m = await evaluate(cdp, `${PAGE_MEASURE}(${JSON.stringify(svg)}, ${JSON.stringify(BACKGROUNDS[theme])})`)
       if (m.error) { rows.push({ name, theme, error: m.error }); continue }

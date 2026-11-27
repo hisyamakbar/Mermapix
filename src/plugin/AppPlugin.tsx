@@ -16,6 +16,7 @@ import { initMermaid, THEME_PRESETS } from '../themes/presets.ts'
 import { buildExportSvg, copyToFigma } from '../export/svg.ts'
 import { useCanvasZoom } from '../hooks/useCanvasZoom.ts'
 import { sanitizeMermaidCode } from '../utils/sanitize.ts'
+import { explainRenderError } from '../utils/diagramSupport.ts'
 import Toolbar from '../components/Toolbar.tsx'
 import EditorPanel from '../components/EditorPanel.tsx'
 import Canvas from '../components/Canvas.tsx'
@@ -275,7 +276,7 @@ export default function AppPlugin() {
         setAwaitingRender(false)
       } catch (err) {
         if (!active) return
-        setError(err instanceof Error ? err.message : String(err))
+        setError(explainRenderError(source, err instanceof Error ? err.message : String(err)))
         setErrorFor({ code, theme })
         setAwaitingRender(false)
       }

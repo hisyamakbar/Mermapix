@@ -859,6 +859,101 @@ button, a {
 }
 
 /* -------------------------------------------------------------
+   Themed scrollbars (one shared rule for every scrollable area)
+   Thin, transparent track, rounded thumb in the muted token colour,
+   a little stronger on hover, transparent corner. The lane is a fixed
+   10px (`--scrollbar-size`) so the code editor can reserve the same
+   space in its gutter. Chromium and Safari use the ::-webkit-scrollbar
+   rules (they ignore them once scrollbar-color/width is set, so the
+   standard properties are given to browsers without them only:
+   Firefox). Add a new scroll area by adding its selector here.
+------------------------------------------------------------- */
+.mpx-app {
+  --scrollbar-size: 10px;
+  --scroll-thumb: color-mix(in srgb, var(--muted) 45%, transparent);
+  --scroll-thumb-hover: color-mix(in srgb, var(--muted) 80%, transparent);
+}
+
+.code-highlight::-webkit-scrollbar,
+.code-textarea::-webkit-scrollbar,
+.editor-error::-webkit-scrollbar,
+.modal-dialog::-webkit-scrollbar,
+.modal-textarea::-webkit-scrollbar,
+.mpx-plugin-app .mpx-source-strip__list::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+  background: transparent;
+}
+
+.code-highlight::-webkit-scrollbar-track,
+.code-textarea::-webkit-scrollbar-track,
+.editor-error::-webkit-scrollbar-track,
+.modal-dialog::-webkit-scrollbar-track,
+.modal-textarea::-webkit-scrollbar-track,
+.mpx-plugin-app .mpx-source-strip__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.code-highlight::-webkit-scrollbar-thumb,
+.code-textarea::-webkit-scrollbar-thumb,
+.editor-error::-webkit-scrollbar-thumb,
+.modal-dialog::-webkit-scrollbar-thumb,
+.modal-textarea::-webkit-scrollbar-thumb,
+.mpx-plugin-app .mpx-source-strip__list::-webkit-scrollbar-thumb {
+  background-color: var(--scroll-thumb);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+
+.code-textarea::-webkit-scrollbar-thumb:hover,
+.editor-error::-webkit-scrollbar-thumb:hover,
+.modal-dialog::-webkit-scrollbar-thumb:hover,
+.modal-textarea::-webkit-scrollbar-thumb:hover,
+.mpx-plugin-app .mpx-source-strip__list::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scroll-thumb-hover);
+}
+
+.code-highlight::-webkit-scrollbar-corner,
+.code-textarea::-webkit-scrollbar-corner,
+.editor-error::-webkit-scrollbar-corner,
+.modal-dialog::-webkit-scrollbar-corner,
+.modal-textarea::-webkit-scrollbar-corner,
+.mpx-plugin-app .mpx-source-strip__list::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.modal-textarea::-webkit-resizer {
+  background: transparent;
+}
+
+/* Firefox (no ::-webkit-scrollbar): standard properties. */
+@supports not selector(::-webkit-scrollbar) {
+  .code-highlight,
+  .code-textarea,
+  .editor-error,
+  .modal-dialog,
+  .modal-textarea,
+  .mpx-plugin-app .mpx-source-strip__list {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
+}
+
+/* The highlight layer sits under the textarea and must scroll exactly like
+   it, so it keeps its scrollbar lanes (same layout) but never paints them:
+   the textarea's own bars are the visible ones. */
+.code-highlight::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .code-highlight {
+    scrollbar-color: transparent transparent;
+  }
+}
+
+/* -------------------------------------------------------------
    Developer Code Editor with Line Numbers & Syntax Highlighting
 ------------------------------------------------------------- */
 .code-editor-container {
@@ -892,7 +987,9 @@ button, a {
 .code-gutter {
   flex: none;
   width: 42px;
-  padding: 12px 0;
+  /* Bottom padding = the textarea's horizontal scrollbar lane, so the gutter
+     can scroll as far as the text does and its last lines stay aligned. */
+  padding: 12px 0 calc(12px + var(--scrollbar-size, 10px));
   background: color-mix(in srgb, var(--editor-bg) 90%, var(--groove) 10%);
   border-right: 1px solid color-mix(in srgb, var(--editor-edge) 75%, transparent);
   user-select: none;
@@ -1229,6 +1326,19 @@ button, a {
    to foreignObject so the `color` captured on every other exported element is unchanged. */
 .mpx-app[data-theme="light"] .diagram-stage svg foreignObject { color: #09090b; }
 .mpx-app[data-theme="dark"] .diagram-stage svg foreignObject { color: #f8fafc; }
+
+/* Wardley maps hard-code white fills and black lines as SVG attributes, and the
+   renderer removes Mermaid's own <style>, so neither themeVariables nor themeCSS
+   reaches them. Host CSS does (the export captures computed styles). The sourcing
+   discs (build / buy / outsource greys) carry meaning and stay as Mermaid draws them. */
+.mpx-app[data-theme="dark"] .diagram-stage svg .wardley-stages line { stroke: #334155; }
+.mpx-app[data-theme="dark"] .diagram-stage svg .wardley-node--anchor .wardley-node-label { fill: #f8fafc; }
+.mpx-app[data-theme="dark"] .diagram-stage svg .wardley-annotation circle,
+.mpx-app[data-theme="dark"] .diagram-stage svg .wardley-annotations-box rect,
+.mpx-app[data-theme="dark"] .diagram-stage svg .wardley-accelerators path,
+.mpx-app[data-theme="dark"] .diagram-stage svg .wardley-deaccelerators path,
+.mpx-app[data-theme="dark"] .diagram-stage svg .wardley-market-overlay,
+.mpx-app[data-theme="dark"] .diagram-stage svg .wardley-market-dot { fill: #1e293b; }
 
 .canvas-hint,
 .loading {

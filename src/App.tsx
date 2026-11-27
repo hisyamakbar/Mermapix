@@ -6,6 +6,7 @@ import { initMermaid } from './themes/presets.ts'
 import { exportSvg, exportPng } from './export/svg.ts'
 import { useCanvasZoom } from './hooks/useCanvasZoom.ts'
 import { sanitizeMermaidCode } from './utils/sanitize.ts'
+import { explainRenderError } from './utils/diagramSupport.ts'
 import { FIGMA_PLUGIN_URL } from './links.ts'
 import Toolbar from './components/Toolbar.tsx'
 import EditorPanel from './components/EditorPanel.tsx'
@@ -125,7 +126,7 @@ export default function App() {
         setSvg(rendered)
         setError(null)
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : String(err))
+        if (active) setError(explainRenderError(source, err instanceof Error ? err.message : String(err)))
       }
     }, 300)
     return () => {

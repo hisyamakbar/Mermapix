@@ -63,9 +63,10 @@ test('state group names and pseudo state kinds', () => {
 })
 
 test('fallback mode per diagram type', () => {
-  for (const t of ['er', 'flowchart-v2', 'flowchart-elk', 'sequence', 'class', 'stateDiagram']) assert.equal(fallbackMode(t), 'skip', t)
+  // `class` is what Mermaid 11.16.1 reported for a class diagram, `classDiagram` what 12.3.0 reports (also the marker id prefix).
+  for (const t of ['er', 'flowchart-v2', 'flowchart-elk', 'sequence', 'class', 'classDiagram', 'stateDiagram']) assert.equal(fallbackMode(t), 'skip', t)
   for (const t of ['pie', 'gantt', 'xychart', 'quadrantChart', 'sankey', 'packet', 'treemap', 'radar', 'venn', 'gitGraph', 'timeline', 'journey']) assert.equal(fallbackMode(t), 'marks', t)
-  for (const t of ['block', 'c4', 'kanban', 'architecture', 'mindmap', 'requirement', 'wardley']) assert.equal(fallbackMode(t), 'nodes', t)
+  for (const t of ['block', 'c4', 'kanban', 'architecture', 'mindmap', 'requirement', 'wardley', 'usecase', 'agentflow']) assert.equal(fallbackMode(t), 'nodes', t)
   assert.equal(fallbackMode(''), 'names')
   assert.equal(fallbackMode('swimlane'), 'names')
   assert.equal(fallbackMode('someFutureDiagram'), 'names')
@@ -82,6 +83,9 @@ test('layer naming helpers', () => {
   assert.equal(cleanRawId('mermaid-svg-12-test_req2'), 'test_req2')
   assert.equal(cleanRawId('mermaid-svg-0-node-3'), 'node')
   assert.equal(cleanRawId('mermaid-svg-0'), '')
+  // Mermaid 12.3.0 prefixes the block diagram's edge ids twice
+  assert.equal(cleanRawId('mermaid-svg-0-mermaid-svg-0-1-a-b'), '1-a-b')
+  assert.equal(cleanRawId('mermaid-svg-3-mermaid-svg-3-2-b-c'), '2-b-c')
   assert.equal(vectorKind('M 0 0 L 100 0', 100, 0, false), 'Line')
   assert.equal(vectorKind('M 0 0 L 10 10 L 20 0', 20, 10, false), 'Curve')
   assert.equal(vectorKind('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z', 10, 10, true), 'Rectangle')

@@ -69,7 +69,8 @@ Mermapix/
 │   │   ├── figmaTheme.ts           # Pure: Figma's theme from the `figma-light`/`figma-dark` class on <html>, which theme wins (open, Figma switch, edit mode)
 │   │   └── diagramName.ts          # Pure: layer name of a new diagram, from its code (frontmatter title, title directive, accTitle, diagram type)
 │   ├── utils/
-│   │   └── sanitize.ts             # AI markdown fence sanitizer
+│   │   ├── sanitize.ts             # AI markdown fence sanitizer
+│   │   └── diagramSupport.ts       # Pure: Mermaid diagram ids and keywords Mermapix converts, the "not supported" list (ZenUML), the message for a render error
 │   └── examples/                   # Built-in diagram templates (?raw imports)
 │       ├── erd.mmd                 # Default e-commerce database schema
 │       ├── flowchart.mmd           # Flowchart example with subgraphs
@@ -92,6 +93,8 @@ Mermapix/
 │   │   ├── svgPrep.ts              # Pure pre-import SVG prep: drop label-only clipPaths, inline-once + unique ids on marker groups
 │   │   ├── treemap.ts              # Treemap sections/leaves -> nested frames (+ pure treemapGeometry.ts)
 │   │   ├── railroad.ts             # Railroad grammars: terminal/non-terminal frames, Rule groups (+ pure railroadGeometry.ts)
+│   │   ├── usecase.ts              # Use case: Actor units, Use Case frames, boundary/package containers, relations (+ pure usecaseGeometry.ts)
+│   │   ├── agentflow.ts            # Agentflow: Flow containers, nodes named by kind, sequence/reference/failure edges (+ pure agentflowGeometry.ts)
 │   │   ├── naming.ts               # Pure helpers: ERD entity matcher, marker kind/layer names, connector/shape patterns
 │   │   ├── erdPaints.ts            # Pure per-part ERD fill/border extraction (header, rows, border)
 │   │   ├── erdLayout.ts            # Pure ERD column-width planner
@@ -117,6 +120,8 @@ Mermapix/
 │   ├── plugin-mock/                # In-memory mock Figma + synthetic ERD scene used by tests/unit/plugin-harness.test.mjs; session.mjs runs several messages (insert, select, update) against one plugin start
 │   ├── export-svg.mjs              # Headless Chrome regression runner via CDP
 │   ├── fixtures/                   # Mermaid sample files for regression
+│   ├── figma-fixtures/             # One or more .mmd per diagram type, exported by export-fixtures.mjs and inserted by the Test Runner
+│   ├── official-samples/           # Mermaid's own sample diagrams (@mermaid-js/examples), refreshed by scripts/refresh-official-samples.mjs
 │   ├── baseline/                   # Verified baseline SVG exports
 │   ├── unit/                       # Converter & sanitizer unit tests (node --test)
 │   └── README.md                   # Automated & manual Figma testing guidelines
@@ -155,12 +160,14 @@ Mermapix/
    - The editor draft is never overwritten without a user action, and is not persisted while a linked diagram is being edited. Inside edit mode the code belongs to the diagram: canvas text edits are written into it (with Undo); the remembered draft is never touched.
    - Live update never replaces changes made in Figma: a live (`quiet`) update that meets `update-needs-confirm` pauses live update until the user clicks Update. A code change that came from the canvas never triggers a live update. One update in flight at a time, always built from a preview of exactly the editor's code.
    - Finishing edit mode (Save) never drops typed code: it updates the diagram first, asks before replacing Figma edits, and asks before leaving with code that cannot be rendered.
+11. **Mermaid defaults are pinned** (`initMermaid` in `src/themes/presets.ts`): `look: 'classic'` globally and `layout: 'dagre'` per type for flowchart, state, class, er and requirement, plus the 11.x node sizing. Mermaid 12 defaults to ELK and the `neo` look; the plugin converters, the fixtures and the themes are built on the pinned values. Never set `layout` globally (mindmap and swimlane choose their own). Styles Mermaid offers no theme variable for go into `themeCss()` in `presets.ts`, or into `src/index.css` for renderers that drop Mermaid's `<style>` (wardley).
+12. **Every Mermaid diagram type is accounted for**: `src/utils/diagramSupport.ts` lists the types Mermapix converts and the ones it refuses; `tests/unit/diagram-coverage.test.mjs` fails when the installed Mermaid registers a type in neither list or a supported type has no fixture. After a Mermaid upgrade, also run `node tests/export-fixtures.mjs` on `tests/figma-fixtures` and `tests/official-samples` and regenerate `tests/fixtures/plugin/` (see `tests/README.md`).
 
 ## Dependencies
 
 - Runtime: React 19 and React DOM 19
 - Icons: `lucide-react`
-- Diagram Engine: `mermaid` (^11.16.1)
+- Diagram Engine: `mermaid` (^12.3.0)
 - Styling: Tailwind CSS v4 with `@tailwindcss/vite`
 - Tooling: Vite 8, TypeScript 5.7, Node 22+
 

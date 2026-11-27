@@ -23,6 +23,12 @@ test('isErdEntityName rejects relationship edges and self-relationship pieces', 
   assert.equal(isErdEntityName('mermaid-svg-0-entity-CATEGORY-4-cyclic-special-2'), false)
 })
 
+test('isErdEntityName keeps the 12.3.0 single-path self-relationship out of the table matcher too', () => {
+  // 11.16.1 drew `CATEGORY ||--o{ CATEGORY` as three `cyclic-special` pieces, 12.3.0 draws one ordinary relationship path
+  assert.equal(isErdEntityName('mermaid-svg-0-id_entity-CATEGORY-4_entity-CATEGORY-4_4'), false)
+  assert.equal(isConnectorLayerName('mermaid-svg-0-id_entity-CATEGORY-4_entity-CATEGORY-4_4'), true)
+})
+
 test('isErdEntityName rejects unrelated names', () => {
   for (const n of ['', null, undefined, 'Group', 'root-0', 'entity-X', 'mermaid-svg-0-entity-X', 'edgePaths']) {
     assert.equal(isErdEntityName(n), false, String(n))
@@ -49,6 +55,15 @@ test('markerKindFromId maps real Mermaid marker ids', () => {
     'mermaid-svg-0_class-compositionEnd': 'composition',
     'mermaid-svg-0_class-aggregationStart': 'aggregation',
     'mermaid-svg-0_class-dependencyEnd': 'dependency',
+    // Mermaid 12.3.0 names the class markers after the diagram type `classDiagram` (11.16.1: `class`)
+    'mermaid-svg-0_classDiagram-extensionStart': 'inheritance',
+    'mermaid-svg-0_classDiagram-extensionEnd-margin': 'inheritance',
+    'mermaid-svg-0_classDiagram-compositionEnd': 'composition',
+    'mermaid-svg-0_classDiagram-aggregationStart-margin': 'aggregation',
+    'mermaid-svg-0_classDiagram-dependencyEnd': 'dependency',
+    'mermaid-svg-0_classDiagram-lollipopStart': 'lollipop',
+    'mermaid-svg-0_block-pointEnd': 'arrowhead',
+    'd0_usecase-pointEnd': 'arrowhead',
     'something-else': 'marker',
   }
   for (const [id, kind] of Object.entries(cases)) assert.equal(markerKindFromId(id), kind, id)

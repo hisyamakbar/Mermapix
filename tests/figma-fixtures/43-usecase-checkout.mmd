@@ -1,0 +1,16 @@
+usecase-beta
+direction LR
+actor Customer("Customer")
+actor Admin("Administrator")
+systemBoundary shop["Online shop"]
+  Browse("Browse products")
+  Checkout("Place order")
+  Payment("Pay")
+  Coupon("Apply coupon")
+  Manage("Manage catalogue")
+end
+Customer --> Browse
+Customer --> Checkout
+Admin --> Manage
+Checkout ..> : include Payment
+Coupon ..> : extend Checkout

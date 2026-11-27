@@ -4,6 +4,28 @@ All notable changes to Mermapix are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 1.3.0 - 2026-11-27
+
+### Added
+- **Use case diagrams** (`usecase-beta`). Actors become one movable unit each (`Actor: <name>`), use cases become frames with editable, centred labels (`Use Case: <label>`), system boundaries and packages become containers that hold their use cases, and every relation is grouped in `Connectors` with its `«include»` / `«extend»` label and marker.
+- **Agentflow diagrams** (`agentflow-beta`). Flows become nested `Flow: <title>` containers, nodes are named by kind (`Task`, `Tool`, `Decision`, `Input`, `Action`, `Refdoc`), and reference and failure edges are named as such.
+- `flowchart-elk` diagrams convert like other flowcharts.
+- A clear message for diagram types Mermapix does not support: a ZenUML diagram now says so and points to `sequenceDiagram`, and a mistyped first keyword suggests the closest diagram type instead of showing Mermaid's "No diagram type detected".
+- Tests: Mermaid's 81 official sample diagrams (`tests/official-samples/`) run through the export check (`node tests/export-fixtures.mjs --fixtures tests/official-samples`), and a unit test fails when the installed Mermaid registers a diagram type that has neither a fixture nor an entry in the "not supported" list.
+
+### Changed
+- **Mermaid 12.3.0** (was 11.16.1). Mermaid 12 lays out with ELK and draws flowchart, class, ER, state and sequence diagrams in a new look by default; Mermapix keeps the layout and look of earlier versions for those types. Diagrams that still come out differently, because Mermaid itself changed: a subgraph with `direction` that has edges crossing its border now ignores that direction (as Mermaid documents), an ER self-relationship is one line, C4 persons are drawn as shapes, block and swimlane diagrams have different sizes.
+- Scrollbars in the code editor, the error box and the dialogs are thin and follow the theme, in the web app and the plugin.
+- The plugin UI file is larger (5.8 MB, was 4.0 MB): Mermaid 12 bundles the ELK layout engine, which use case and agentflow diagrams use.
+
+### Fixed
+- Dark theme: an XY chart no longer has a white plot background; excluded days in a gantt chart, wardley map markers and annotation boxes are no longer white; the radar grid is no longer a heavy grey.
+- Light theme: an active gantt task is no longer white on white, and gantt grid lines are visible.
+- Radar charts: long axis labels on the left and right are no longer cut off in the export.
+- Class diagrams: the small box behind a lollipop interface label is gone.
+- Code editor: with a horizontal scrollbar showing, the line numbers at the bottom no longer drift from their lines.
+- Plugin: a relation label that Mermaid places further from its line (class and state diagrams) stays in its edge group.
+
 ## 1.2.0 - 2026-11-20
 
 ### Added

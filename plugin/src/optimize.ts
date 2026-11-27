@@ -18,6 +18,10 @@ import { convertErdTables } from './erd.ts'
 import { convertFlowchartNodes } from './flowchart.ts'
 import { convertClusters, nestIntoClusters } from './subgraphs.ts'
 import { arrangeFlowchart } from './connectors.ts'
+import { convertAgentflow } from './agentflow.ts'
+import { convertUsecase } from './usecase.ts'
+import { agentflowEdgeStyle, markerKindOfLayer } from './agentflowGeometry.ts'
+import { isRealDash } from './shapeGeometry.ts'
 import { convertEdgeLabels } from './edgeLabels.ts'
 import { convertSequence } from './sequence.ts'
 import { convertClasses, convertClassInterfaces, convertClassNotes } from './class.ts'
@@ -59,6 +63,32 @@ const flowchartStep: DiagramStep = {
     // Subgraphs -> frames, then every node/cluster frame into the smallest cluster that contains it.
     convertClusters(rootNode)
     nestIntoClusters(rootNode)
+  },
+}
+
+/** usecase-beta (Phase 14.3): actors, use cases, notes, system boundaries / packages. Relations are grouped by the connectors step. */
+const usecaseStep: DiagramStep = {
+  name: 'usecase',
+  run: (rootNode, _theme, ctx) => {
+    if (!ctx || ctx.diagramType !== 'usecase') return
+    try {
+      convertUsecase(rootNode)
+    } catch {
+      // Beta syntax: never abort the insert, the generic fallback names what is left.
+    }
+  },
+}
+
+/** agentflow-beta (Phase 14.4): nodes by kind, flow containers, edge kinds. Reuses the flowchart pipeline. */
+const agentflowStep: DiagramStep = {
+  name: 'agentflow',
+  run: (rootNode, _theme, ctx) => {
+    if (!ctx || ctx.diagramType !== 'agentflow') return
+    try {
+      convertAgentflow(rootNode)
+    } catch {
+      // Beta syntax: a failure must never abort the insert, the generic fallback names what is left.
+    }
   },
 }
 
@@ -148,7 +178,15 @@ const edgeLabelStep: DiagramStep = {
  */
 const connectorsStep: DiagramStep = {
   name: 'connectors',
-  run: (rootNode) => {
+  run: (rootNode, _theme, ctx) => {
+    if (ctx && ctx.diagramType === 'agentflow') {
+      // sequence / reference / failure edges are told apart by marker kind and dash
+      arrangeFlowchart(rootNode, {
+        classifyEdge: (vector, markers) =>
+          agentflowEdgeStyle(markers.map((m) => markerKindOfLayer(m.name)).filter(Boolean), isRealDash(vector.dashPattern)),
+      })
+      return
+    }
     arrangeFlowchart(rootNode)
   },
 }
@@ -170,7 +208,7 @@ const genericStep: DiagramStep = {
 }
 
 /** Per-diagram-type steps, executed in order between the initial purge and the generic cleanup. */
-export const DIAGRAM_STEPS: DiagramStep[] = [erdStep, flowchartStep, sequenceStep, classStep, stateStep, treemapStep, railroadStep, edgeLabelStep, connectorsStep, genericStep]
+export const DIAGRAM_STEPS: DiagramStep[] = [erdStep, flowchartStep, usecaseStep, agentflowStep, sequenceStep, classStep, stateStep, treemapStep, railroadStep, edgeLabelStep, connectorsStep, genericStep]
 
 /**
  * Figma imports the SVG root as a frame whose white fill is not shown (canvas shows through),

@@ -26,6 +26,7 @@ This is the canonical project structure. Start with task-relevant files below.
 Mermapix/
 ├── src/
 │   ├── main.tsx                    # React entrypoint mounting into #root
+│   ├── web.css                     # Web app only (imported by main.tsx, not by the plugin UI): hides the shared onboarding card behind the web one
 │   ├── App.tsx                     # Top-level state coordinator (code, theme, sidebar, modal)
 │   ├── index.css                   # Global CSS, Tailwind v4 imports, design tokens, responsive styles (shared with the plugin UI)
 │   ├── links.ts                    # FIGMA_PLUGIN_URL (Figma Community listing)
@@ -37,6 +38,7 @@ Mermapix/
 │   │   ├── CodeEditor.tsx          # Code editor with syntax highlighting, line numbers, error alerts
 │   │   ├── Canvas.tsx              # Interactive pan/zoom canvas and floating zoom pill
 │   │   ├── CanvasEmptyState.tsx    # 3-step onboarding card with sample loader; `variant` "web" (step 3 links to the Community plugin) or "plugin" (step 3 describes Insert)
+│   │   ├── WebEmptyState.tsx       # Web-only onboarding card (rule 8 fork of CanvasEmptyState, portaled into the canvas by App.tsx): general title, step 3 = Export (SVG/PNG, plugin link); fold back at the next plugin release
 │   │   ├── ImportModal.tsx         # DBML & SQL schema import modal with table naming options
 │   │   ├── AboutModal.tsx          # About dialog with open source licenses and disclaimers; `showPluginLink` (web only) adds the Figma Community link
 │   │   ├── MermapixLogo.tsx        # Brand lockup: inline SVG (icon as ?inline WebP data URL + wordmark paths)

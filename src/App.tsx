@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import mermaid from 'mermaid'
 import { PanelLeft, Code2, Network, Sparkles, ChevronDown, Wand2, FolderInput } from 'lucide-react'
 import { DEFAULT_EXAMPLE, EXAMPLES } from './examples/index.ts'
@@ -11,6 +12,7 @@ import { FIGMA_PLUGIN_URL } from './links.ts'
 import Toolbar from './components/Toolbar.tsx'
 import EditorPanel from './components/EditorPanel.tsx'
 import Canvas from './components/Canvas.tsx'
+import WebEmptyState from './components/WebEmptyState.tsx'
 import ImportModal from './components/ImportModal.tsx'
 import AboutModal from './components/AboutModal.tsx'
 import type { Theme } from './types/index.ts'
@@ -104,6 +106,14 @@ export default function App() {
     handlePointerMove,
     handlePointerUp,
   } = useCanvasZoom(svg)
+
+  // The web onboarding card is portaled into the canvas section (see WebEmptyState.tsx); the shared card
+  // that Canvas renders is hidden by src/web.css.
+  const [canvasEl, setCanvasEl] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setCanvasEl(canvasRef.current)
+  }, [canvasRef])
+  const showEmptyState = !svg && !code.trim()
 
   // Live render: validate then render Mermaid whenever code or theme changes
   useEffect(() => {
@@ -340,6 +350,9 @@ export default function App() {
           onLoadSample={() => setCode(DEFAULT_DIAGRAM)}
           emptyStateVariant="web"
         />
+        {showEmptyState &&
+          canvasEl &&
+          createPortal(<WebEmptyState onLoadSample={() => setCode(DEFAULT_DIAGRAM)} />, canvasEl)}
       </div>
 
       <ImportModal

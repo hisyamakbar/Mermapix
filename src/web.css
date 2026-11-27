@@ -1,0 +1,8 @@
+/* Web app only (imported by src/main.tsx after index.css). The Figma plugin UI imports index.css but
+   not this file, so web-only styles here never change the plugin bundle (AGENTS.md rule 8). */
+
+/* Web onboarding card (WebEmptyState.tsx, portaled into the canvas). It replaces the shared card, which
+   stays in the DOM because Canvas.tsx renders it, so hide that one. */
+.mpx-canvas > .canvas-empty-state:not(.web-empty-state) {
+  display: none;
+}

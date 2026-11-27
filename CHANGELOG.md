@@ -4,6 +4,11 @@ All notable changes to Mermapix are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+- Web app: the onboarding card is no longer about Figma only. Its title is "Mermaid to Editable Pixel" and step 3 is **Export** (download SVG or PNG, with a link to the Figma plugin for editable layers). The plugin's card is unchanged.
+
 ## 1.3.0 - 2026-11-27
 
 ### Added
